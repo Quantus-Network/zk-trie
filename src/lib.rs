@@ -935,8 +935,8 @@ mod tests {
 		let mut ex = Vec::<u8>::new();
 		// 8-byte branch header (no value, nibble_count=0, type=2)
 		ex.extend_from_slice(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20]);
-		ex.push(0x12); // slots 1 & 4 are taken from 0-7
-		ex.push(0x00); // no slots from 8-15
+		// 8-byte bitmap (slots 1 & 4 are taken from 0-7, no slots from 8-15)
+		ex.extend_from_slice(&[0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 		ex.push(to_compact(0x0C)); // first slot: LEAF, 12 bytes long (8-byte header + data)
 		// 8-byte leaf header (nibble_count=3, type=3)
 		ex.extend_from_slice(&[0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30]);

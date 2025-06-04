@@ -40,16 +40,16 @@ impl TrieStream {
 	}
 }
 
-fn branch_node_bit_mask(has_children: impl Iterator<Item = bool>) -> (u8, u8) {
-	let mut bitmap: u16 = 0;
-	let mut cursor: u16 = 1;
+fn branch_node_bit_mask(has_children: impl Iterator<Item = bool>) -> [u8; 8] {
+	let mut bitmap: u64 = 0;
+	let mut cursor: u64 = 1;
 	for v in has_children {
 		if v {
 			bitmap |= cursor
 		}
 		cursor <<= 1;
 	}
-	((bitmap % 256) as u8, (bitmap / 256) as u8)
+	bitmap.to_le_bytes()
 }
 
 /// Create a leaf/branch node, encoding a number of nibbles.
@@ -118,7 +118,7 @@ impl trie_root::TrieStream for TrieStream {
 
 			self.buffer.extend(fuse_nibbles_node(partial, kind));
 			let bm = branch_node_bit_mask(has_children);
-			self.buffer.extend([bm.0, bm.1].iter());
+			self.buffer.extend_from_slice(&bm);
 		} else {
 			unreachable!("trie stream codec only for no extension trie");
 		}

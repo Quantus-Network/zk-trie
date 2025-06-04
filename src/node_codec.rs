@@ -304,17 +304,17 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
 	output
 }
 
-const BITMAP_LENGTH: usize = 2;
+const BITMAP_LENGTH: usize = 8;
 
 /// Radix 16 trie, bitmap encoding implementation,
 /// it contains children mapping information for a branch
 /// (children presence only), it encodes into
 /// a compact bitmap encoding representation.
-pub(crate) struct Bitmap(u16);
+pub(crate) struct Bitmap(u64);
 
 impl Bitmap {
 	pub fn decode(data: &[u8]) -> Result<Self, codec::Error> {
-		let value = u16::decode(&mut &data[..])?;
+		let value = u64::decode(&mut &data[..])?;
 		if value == 0 {
 			Err("Bitmap without a child.".into())
 		} else {
@@ -323,19 +323,20 @@ impl Bitmap {
 	}
 
 	pub fn value_at(&self, i: usize) -> bool {
-		self.0 & (1u16 << i) != 0
+		self.0 & (1u64 << i) != 0
 	}
 
 	pub fn encode<I: Iterator<Item = bool>>(has_children: I, dest: &mut [u8]) {
-		let mut bitmap: u16 = 0;
-		let mut cursor: u16 = 1;
+		let mut bitmap: u64 = 0;
+		let mut cursor: u64 = 1;
 		for v in has_children {
 			if v {
 				bitmap |= cursor
 			}
 			cursor <<= 1;
 		}
-		dest[0] = (bitmap % 256) as u8;
-		dest[1] = (bitmap / 256) as u8;
+		// Store as little-endian 8-byte value
+		let bytes = bitmap.to_le_bytes();
+		dest[..8].copy_from_slice(&bytes);
 	}
 }
