@@ -163,7 +163,7 @@ impl<H: Hasher> From<StorageProof> for crate::MemoryDB<H> {
 
 impl<H: Hasher> From<&StorageProof> for crate::MemoryDB<H> {
 	fn from(proof: &StorageProof) -> Self {
-		let mut db = crate::MemoryDB::default();
+		let mut db = crate::MemoryDB::new(&0u64.to_le_bytes());
 		proof.iter_nodes().for_each(|n| {
 			db.insert(crate::EMPTY_PREFIX, &n);
 		});

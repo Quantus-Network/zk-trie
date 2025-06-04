@@ -95,9 +95,11 @@ where
 
 	fn decode_plan(data: &[u8]) -> Result<NodePlan, Self::Error> {
 		let mut input = ByteSliceInput::new(data);
-
+		println!("decode_plan: {:?}", data);
 		let header = NodeHeader::decode(&mut input)?;
+		println!("decode_plan");
 		let contains_hash = header.contains_hash_of_value();
+		println!("decode_plan");
 
 		let branch_has_value = if let NodeHeader::Branch(has_value, _) = &header {
 			*has_value
@@ -105,10 +107,15 @@ where
 			// hashed_value_branch
 			true
 		};
+		println!("decode_plan");
 
 		match header {
-			NodeHeader::Null => Ok(NodePlan::Empty),
+			NodeHeader::Null => {
+				println!("decode_plan: Null");
+				Ok(NodePlan::Empty)
+			},
 			NodeHeader::HashedValueBranch(nibble_count) | NodeHeader::Branch(_, nibble_count) => {
+				println!("decode_plan: HashedValueBranch");
 				let padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
 				// check that the padding is valid (if any)
 				if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
@@ -153,6 +160,7 @@ where
 				})
 			},
 			NodeHeader::HashedValueLeaf(nibble_count) | NodeHeader::Leaf(nibble_count) => {
+				println!("decode_plan: HashedValueLeaf");
 				let padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
 				// check that the padding is valid (if any)
 				if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
@@ -183,7 +191,9 @@ where
 	}
 
 	fn empty_node() -> &'static [u8] {
-		&[trie_constants::EMPTY_TRIE]
+		// Return 8-byte encoding for Null header (type 0, nibble_count 0)
+		// This matches NodeHeader::Null.encode() output
+		&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 	}
 
 	fn leaf_node(partial: impl Iterator<Item = u8>, number_nibble: usize, value: Value) -> Vec<u8> {

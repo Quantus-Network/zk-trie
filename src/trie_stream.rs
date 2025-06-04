@@ -54,19 +54,24 @@ fn branch_node_bit_mask(has_children: impl Iterator<Item = bool>) -> (u8, u8) {
 
 /// Create a leaf/branch node, encoding a number of nibbles.
 fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> impl Iterator<Item = u8> + '_ {
+	use crate::node_header::NodeHeader;
+	use codec::Encode;
+	
 	let size = nibbles.len();
-	let iter_start = match kind {
-		NodeKind::Leaf => size_and_prefix_iterator(size, trie_constants::LEAF_PREFIX_MASK, 2),
-		NodeKind::BranchNoValue =>
-			size_and_prefix_iterator(size, trie_constants::BRANCH_WITHOUT_MASK, 2),
-		NodeKind::BranchWithValue =>
-			size_and_prefix_iterator(size, trie_constants::BRANCH_WITH_MASK, 2),
-		NodeKind::HashedValueLeaf =>
-			size_and_prefix_iterator(size, trie_constants::ALT_HASHING_LEAF_PREFIX_MASK, 3),
-		NodeKind::HashedValueBranch =>
-			size_and_prefix_iterator(size, trie_constants::ALT_HASHING_BRANCH_WITH_MASK, 4),
+	
+	// Create the appropriate NodeHeader and encode it to 8 bytes
+	let header = match kind {
+		NodeKind::Leaf => NodeHeader::Leaf(size),
+		NodeKind::BranchNoValue => NodeHeader::Branch(false, size),
+		NodeKind::BranchWithValue => NodeHeader::Branch(true, size),
+		NodeKind::HashedValueLeaf => NodeHeader::HashedValueLeaf(size),
+		NodeKind::HashedValueBranch => NodeHeader::HashedValueBranch(size),
 	};
-	iter_start
+	
+	let header_bytes = header.encode();
+	
+	// Return iterator that yields the 8-byte header followed by nibble data
+	header_bytes.into_iter()
 		.chain(if nibbles.len() % 2 == 1 { Some(nibbles[0]) } else { None })
 		.chain(nibbles[nibbles.len() % 2..].chunks(2).map(|ch| ch[0] << 4 | ch[1]))
 }
@@ -78,7 +83,7 @@ impl trie_root::TrieStream for TrieStream {
 	}
 
 	fn append_empty_data(&mut self) {
-		self.buffer.push(trie_constants::EMPTY_TRIE);
+		self.buffer.extend_from_slice(&trie_constants::EMPTY_TRIE);
 	}
 
 	fn append_leaf(&mut self, key: &[u8], value: TrieStreamValue) {

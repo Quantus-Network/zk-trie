@@ -87,9 +87,13 @@ pub mod tests {
 
 	#[test]
 	fn proof_with_unused_nodes_is_rejected() {
+		println!("here");
 		let (raw_proof, root) = create_storage_proof::<Layout>(TEST_DATA);
+		println!("here");
 		let proof = StorageProof::new(raw_proof.clone());
+		println!("here");
 		let proof_nodes_count = proof.len();
+		println!("here");
 
 		let mut accessed_nodes_tracker = AccessedNodesTracker::<Hash>::new(proof_nodes_count);
 		{
@@ -103,7 +107,7 @@ pub mod tests {
 			trie.get(b"key3").unwrap().unwrap();
 		}
 		assert_eq!(accessed_nodes_tracker.ensure_no_unused_nodes(), Ok(()));
-
+		println!("here");
 		let mut accessed_nodes_tracker = AccessedNodesTracker::<Hash>::new(proof_nodes_count);
 		{
 			let db = proof.into_memory_db();
