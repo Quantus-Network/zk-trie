@@ -17,7 +17,7 @@
 
 //! The node header.
 
-use crate::trie_constants;
+
 use codec::{Decode, Encode, Input, Output};
 use core::iter::once;
 

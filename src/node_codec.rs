@@ -134,7 +134,12 @@ where
 					Some(if contains_hash {
 						ValuePlan::Node(input.take(H::LENGTH)?)
 					} else {
-						let count = <Compact<u32>>::decode(&mut input)?.0 as usize;
+						// Read 8-byte little-endian length
+						let length_range = input.take(8)?;
+						let length_bytes = &data[length_range];
+						let mut length_array = [0u8; 8];
+						length_array.copy_from_slice(length_bytes);
+						let count = u64::from_le_bytes(length_array) as usize;
 						ValuePlan::Inline(input.take(count)?)
 					})
 				} else {
@@ -178,7 +183,12 @@ where
 				let value = if contains_hash {
 					ValuePlan::Node(input.take(H::LENGTH)?)
 				} else {
-					let count = <Compact<u32>>::decode(&mut input)?.0 as usize;
+					// Read 8-byte little-endian length
+					let length_range = input.take(8)?;
+					let length_bytes = &data[length_range];
+					let mut length_array = [0u8; 8];
+					length_array.copy_from_slice(length_bytes);
+					let count = u64::from_le_bytes(length_array) as usize;
 					ValuePlan::Inline(input.take(count)?)
 				};
 
@@ -209,7 +219,9 @@ where
 		};
 		match value {
 			Value::Inline(value) => {
-				Compact(value.len() as u32).encode_to(&mut output);
+				// Encode length as 8-byte little-endian
+				let length_bytes = (value.len() as u64).to_le_bytes();
+				output.extend_from_slice(&length_bytes);
 				output.extend_from_slice(value);
 			},
 			Value::Node(hash) => {
@@ -256,7 +268,9 @@ where
 		(0..BITMAP_LENGTH).for_each(|_| output.push(0));
 		match value {
 			Some(Value::Inline(value)) => {
-				Compact(value.len() as u32).encode_to(&mut output);
+				// Encode length as 8-byte little-endian
+				let length_bytes = (value.len() as u64).to_le_bytes();
+				output.extend_from_slice(&length_bytes);
 				output.extend_from_slice(value);
 			},
 			Some(Value::Node(hash)) => {

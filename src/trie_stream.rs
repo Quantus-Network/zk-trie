@@ -18,11 +18,11 @@
 //! `TrieStream` implementation for Substrate's trie format.
 
 use crate::{
-	node_header::{size_and_prefix_iterator, NodeKind},
+	node_header::NodeKind,
 	trie_constants,
 };
 use alloc::vec::Vec;
-use codec::{Compact, Encode};
+use codec::Encode;
 use hash_db::Hasher;
 use trie_root;
 
@@ -112,7 +112,9 @@ impl trie_root::TrieStream for TrieStream {
 		self.buffer.extend_from_slice(&fuse_nibbles_node(key, kind));
 		match &value {
 			TrieStreamValue::Inline(value) => {
-				Compact(value.len() as u32).encode_to(&mut self.buffer);
+				// Encode length as 8-byte little-endian
+				let length_bytes = (value.len() as u64).to_le_bytes();
+				self.buffer.extend_from_slice(&length_bytes);
 				self.buffer.extend_from_slice(value);
 			},
 			TrieStreamValue::Node(hash) => {
@@ -143,7 +145,9 @@ impl trie_root::TrieStream for TrieStream {
 		match maybe_value {
 			None => (),
 			Some(TrieStreamValue::Inline(value)) => {
-				Compact(value.len() as u32).encode_to(&mut self.buffer);
+				// Encode length as 8-byte little-endian
+				let length_bytes = (value.len() as u64).to_le_bytes();
+				self.buffer.extend_from_slice(&length_bytes);
 				self.buffer.extend_from_slice(value);
 			},
 			Some(TrieStreamValue::Node(hash)) => {

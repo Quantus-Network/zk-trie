@@ -899,6 +899,10 @@ mod tests {
 		}
 	}
 
+	fn to_u64_le_bytes(n: u8) -> [u8; 8] {
+		(n as u64).to_le_bytes()
+	}
+
 	fn to_compact(n: u8) -> u8 {
 		Compact(n).encode()[0]
 	}
@@ -916,15 +920,13 @@ mod tests {
 		let input = vec![(vec![0xaa], vec![0xbb])];
 		let trie = LayoutV1::trie_root_unhashed(input);
 		println!("trie: {:#x?}", trie);
-		assert_eq!(
-			trie,
-			vec![
-				0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30, // 8-byte leaf header (nibble_count=2, type=3)
-				0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // key data (felt-aligned to 8 bytes)
-				to_compact(1), // length of value in bytes as Compact
-				0xbb           // value data
-			]
-		);
+		let mut expected = vec![
+			0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30, // 8-byte leaf header (nibble_count=2, type=3)
+			0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // key data (felt-aligned to 8 bytes)
+		];
+		expected.extend_from_slice(&to_u64_le_bytes(1)); // length of value in bytes as 8-byte little-endian
+		expected.push(0xbb); // value data
+		assert_eq!(trie, expected);
 	}
 
 	#[test]
@@ -937,23 +939,23 @@ mod tests {
 		ex.extend_from_slice(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20]);
 		// 8-byte bitmap (slots 1 & 4 are taken from 0-7, no slots from 8-15)
 		ex.extend_from_slice(&[0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-		ex.push(to_compact(18)); // first slot: LEAF, 18 bytes long (8-byte header + 8-byte felt-aligned partial + data)
+		ex.push(to_compact(25)); // first slot: LEAF, 25 bytes long (8-byte header + 8-byte felt-aligned partial + 8-byte length + 1-byte data)
 		// 8-byte leaf header (nibble_count=3, type=3)
 		ex.extend_from_slice(&[0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30]);
 		ex.push(0x03); // first nibble
 		ex.push(0x14); // second & third nibble
 		// felt-aligned padding to 8 bytes
 		ex.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-		ex.push(to_compact(0x01)); // 1 byte data
+		ex.extend_from_slice(&to_u64_le_bytes(0x01)); // 1 byte data
 		ex.push(0xff); // value data
-		ex.push(to_compact(18)); // second slot: LEAF, 18 bytes long (8-byte header + 8-byte felt-aligned partial + data)
+		ex.push(to_compact(25)); // second slot: LEAF, 25 bytes long (8-byte header + 8-byte felt-aligned partial + 8-byte length + 1-byte data)
 		// 8-byte leaf header (nibble_count=3, type=3)
 		ex.extend_from_slice(&[0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30]);
 		ex.push(0x08); // first nibble
 		ex.push(0x19); // second & third nibble
 		// felt-aligned padding to 8 bytes
 		ex.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-		ex.push(to_compact(0x01)); // 1 byte data
+		ex.extend_from_slice(&to_u64_le_bytes(0x01)); // 1 byte data
 		ex.push(0xfe); // value data
 
 		assert_eq!(trie, ex);
