@@ -121,10 +121,12 @@ where
 				if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
 					return Err(Error::BadFormat)
 				}
-				let partial = input.take(
-					(nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) /
-						nibble_ops::NIBBLE_PER_BYTE,
-				)?;
+				let nibble_bytes = (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) /
+					nibble_ops::NIBBLE_PER_BYTE;
+				let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+				let felt_aligned_range = input.take(felt_aligned_bytes)?;
+				// Only pass the actual nibble data to NibbleSlicePlan, not the padding
+				let partial = felt_aligned_range.start..(felt_aligned_range.start + nibble_bytes);
 				let partial_padding = nibble_ops::number_padding(nibble_count);
 				let bitmap_range = input.take(BITMAP_LENGTH)?;
 				let bitmap = Bitmap::decode(&data[bitmap_range])?;
@@ -166,10 +168,12 @@ where
 				if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
 					return Err(Error::BadFormat)
 				}
-				let partial = input.take(
-					(nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) /
-						nibble_ops::NIBBLE_PER_BYTE,
-				)?;
+				let nibble_bytes = (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) /
+					nibble_ops::NIBBLE_PER_BYTE;
+				let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+				let felt_aligned_range = input.take(felt_aligned_bytes)?;
+				// Only pass the actual nibble data to NibbleSlicePlan, not the padding
+				let partial = felt_aligned_range.start..(felt_aligned_range.start + nibble_bytes);
 				let partial_padding = nibble_ops::number_padding(nibble_count);
 				let value = if contains_hash {
 					ValuePlan::Node(input.take(H::LENGTH)?)
@@ -290,7 +294,9 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
 	nibble_count: usize,
 	node_kind: NodeKind,
 ) -> Vec<u8> {
-	let mut output = Vec::with_capacity(4 + (nibble_count / nibble_ops::NIBBLE_PER_BYTE));
+	let nibble_bytes = (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) / nibble_ops::NIBBLE_PER_BYTE;
+	let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+	let mut output = Vec::with_capacity(8 + felt_aligned_bytes);
 	match node_kind {
 		NodeKind::Leaf => NodeHeader::Leaf(nibble_count).encode_to(&mut output),
 		NodeKind::BranchWithValue => NodeHeader::Branch(true, nibble_count).encode_to(&mut output),
@@ -300,7 +306,16 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
 		NodeKind::HashedValueBranch =>
 			NodeHeader::HashedValueBranch(nibble_count).encode_to(&mut output),
 	};
-	output.extend(partial);
+	
+	// Collect partial bytes and pad to felt-aligned length
+	let partial_bytes: Vec<u8> = partial.collect();
+	output.extend_from_slice(&partial_bytes);
+	
+	// Pad with zeros to reach felt-aligned length
+	while output.len() - 8 < felt_aligned_bytes {
+		output.push(0);
+	}
+	
 	output
 }
 

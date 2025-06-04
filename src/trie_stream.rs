@@ -53,7 +53,7 @@ fn branch_node_bit_mask(has_children: impl Iterator<Item = bool>) -> [u8; 8] {
 }
 
 /// Create a leaf/branch node, encoding a number of nibbles.
-fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> impl Iterator<Item = u8> + '_ {
+fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> Vec<u8> {
 	use crate::node_header::NodeHeader;
 	use codec::Encode;
 	
@@ -68,12 +68,30 @@ fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> impl Iterator<Item = u8>
 		NodeKind::HashedValueBranch => NodeHeader::HashedValueBranch(size),
 	};
 	
-	let header_bytes = header.encode();
+	let mut result = header.encode();
 	
-	// Return iterator that yields the 8-byte header followed by nibble data
-	header_bytes.into_iter()
-		.chain(if nibbles.len() % 2 == 1 { Some(nibbles[0]) } else { None })
-		.chain(nibbles[nibbles.len() % 2..].chunks(2).map(|ch| ch[0] << 4 | ch[1]))
+	// Calculate nibble bytes needed and felt-align to 8-byte boundary
+	let nibble_bytes = (size + 1) / 2; // Round up for odd nibble counts
+	let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+	
+	// Encode nibbles into bytes
+	let mut partial_bytes = Vec::new();
+	if size % 2 == 1 {
+		partial_bytes.push(nibbles[0]);
+	}
+	for chunk in nibbles[size % 2..].chunks(2) {
+		partial_bytes.push(chunk[0] << 4 | chunk[1]);
+	}
+	
+	// Add the partial bytes
+	result.extend_from_slice(&partial_bytes);
+	
+	// Pad with zeros to reach felt-aligned length
+	while result.len() - 8 < felt_aligned_bytes {
+		result.push(0);
+	}
+	
+	result
 }
 
 use trie_root::Value as TrieStreamValue;
@@ -91,7 +109,7 @@ impl trie_root::TrieStream for TrieStream {
 			TrieStreamValue::Inline(..) => NodeKind::Leaf,
 			TrieStreamValue::Node(..) => NodeKind::HashedValueLeaf,
 		};
-		self.buffer.extend(fuse_nibbles_node(key, kind));
+		self.buffer.extend_from_slice(&fuse_nibbles_node(key, kind));
 		match &value {
 			TrieStreamValue::Inline(value) => {
 				Compact(value.len() as u32).encode_to(&mut self.buffer);
@@ -116,7 +134,7 @@ impl trie_root::TrieStream for TrieStream {
 				Some(TrieStreamValue::Node(..)) => NodeKind::HashedValueBranch,
 			};
 
-			self.buffer.extend(fuse_nibbles_node(partial, kind));
+			self.buffer.extend_from_slice(&fuse_nibbles_node(partial, kind));
 			let bm = branch_node_bit_mask(has_children);
 			self.buffer.extend_from_slice(&bm);
 		} else {

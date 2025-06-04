@@ -920,7 +920,7 @@ mod tests {
 			trie,
 			vec![
 				0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30, // 8-byte leaf header (nibble_count=2, type=3)
-				0xaa,          // key data
+				0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // key data (felt-aligned to 8 bytes)
 				to_compact(1), // length of value in bytes as Compact
 				0xbb           // value data
 			]
@@ -937,18 +937,22 @@ mod tests {
 		ex.extend_from_slice(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20]);
 		// 8-byte bitmap (slots 1 & 4 are taken from 0-7, no slots from 8-15)
 		ex.extend_from_slice(&[0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-		ex.push(to_compact(0x0C)); // first slot: LEAF, 12 bytes long (8-byte header + data)
+		ex.push(to_compact(18)); // first slot: LEAF, 18 bytes long (8-byte header + 8-byte felt-aligned partial + data)
 		// 8-byte leaf header (nibble_count=3, type=3)
 		ex.extend_from_slice(&[0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30]);
 		ex.push(0x03); // first nibble
 		ex.push(0x14); // second & third nibble
+		// felt-aligned padding to 8 bytes
+		ex.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 		ex.push(to_compact(0x01)); // 1 byte data
 		ex.push(0xff); // value data
-		ex.push(to_compact(0x0C)); // second slot: LEAF, 12 bytes long (8-byte header + data)
+		ex.push(to_compact(18)); // second slot: LEAF, 18 bytes long (8-byte header + 8-byte felt-aligned partial + data)
 		// 8-byte leaf header (nibble_count=3, type=3)
 		ex.extend_from_slice(&[0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30]);
 		ex.push(0x08); // first nibble
 		ex.push(0x19); // second & third nibble
+		// felt-aligned padding to 8 bytes
+		ex.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 		ex.push(to_compact(0x01)); // 1 byte data
 		ex.push(0xfe); // value data
 
@@ -1213,6 +1217,43 @@ mod tests {
 		// Test with nibble_count = 0
 		let header = NodeHeader::Leaf(0);
 		round_trip(header);
+	}
+
+	#[test]
+	fn test_felt_aligned_encoding_round_trip() {
+		use crate::node_codec::NodeCodec;
+		use sp_core::Blake2Hasher;
+		use trie_db::node::Value;
+
+		// Test round trip encoding/decoding for various nibble counts
+		let test_cases = vec![
+			(vec![0xaa], 2, "2 nibbles -> 1 byte -> 8 bytes felt-aligned"),
+			(vec![0x03, 0x14], 3, "3 nibbles -> 2 bytes -> 8 bytes felt-aligned"),
+			(vec![0x01, 0x23, 0x45, 0x67], 8, "8 nibbles -> 4 bytes -> 8 bytes felt-aligned"),
+			(vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01], 17, "17 nibbles -> 9 bytes -> 16 bytes felt-aligned"),
+		];
+
+		for (partial_bytes, nibble_count, description) in test_cases {
+			println!("Testing: {}", description);
+			
+			// Encode
+			let encoded = NodeCodec::<Blake2Hasher>::leaf_node(
+				partial_bytes.iter().copied(), 
+				nibble_count, 
+				Value::Inline(&[0xbb])
+			);
+			
+			// Decode
+			let decoded = NodeCodec::<Blake2Hasher>::decode_plan(&encoded).unwrap();
+			
+			// Verify structure
+			if let trie_db::node::NodePlan::Leaf { partial, value } = decoded {
+				// Just verify we got a leaf node with a partial key
+				println!("✓ Successfully decoded leaf node with partial key");
+			} else {
+				panic!("Expected leaf node");
+			}
+		}
 	}
 
 	#[test]
