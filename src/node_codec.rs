@@ -95,11 +95,8 @@ where
 
 	fn decode_plan(data: &[u8]) -> Result<NodePlan, Self::Error> {
 		let mut input = ByteSliceInput::new(data);
-		println!("decode_plan: {:?}", data);
 		let header = NodeHeader::decode(&mut input)?;
-		println!("decode_plan");
 		let contains_hash = header.contains_hash_of_value();
-		println!("decode_plan");
 
 		let branch_has_value = if let NodeHeader::Branch(has_value, _) = &header {
 			*has_value
@@ -107,15 +104,12 @@ where
 			// hashed_value_branch
 			true
 		};
-		println!("decode_plan");
 
 		match header {
 			NodeHeader::Null => {
-				println!("decode_plan: Null");
 				Ok(NodePlan::Empty)
 			},
 			NodeHeader::HashedValueBranch(nibble_count) | NodeHeader::Branch(_, nibble_count) => {
-				println!("decode_plan: HashedValueBranch");
 				let padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
 				// check that the padding is valid (if any)
 				if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
@@ -151,7 +145,12 @@ where
 				];
 				for i in 0..nibble_ops::NIBBLE_LENGTH {
 					if bitmap.value_at(i) {
-						let count = <Compact<u32>>::decode(&mut input)?.0 as usize;
+						// Read 8-byte little-endian length
+						let length_range = input.take(8)?;
+						let length_bytes = &data[length_range];
+						let mut length_array = [0u8; 8];
+						length_array.copy_from_slice(length_bytes);
+						let count = u64::from_le_bytes(length_array) as usize;
 						let range = input.take(count)?;
 						children[i] = Some(if count == H::LENGTH {
 							NodeHandlePlan::Hash(range)
@@ -167,7 +166,6 @@ where
 				})
 			},
 			NodeHeader::HashedValueLeaf(nibble_count) | NodeHeader::Leaf(nibble_count) => {
-				println!("decode_plan: HashedValueLeaf");
 				let padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
 				// check that the padding is valid (if any)
 				if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
@@ -282,11 +280,17 @@ where
 		Bitmap::encode(
 			children.map(|maybe_child| match maybe_child.borrow() {
 				Some(ChildReference::Hash(h)) => {
-					h.as_ref().encode_to(&mut output);
+					// Always encode hash references with 8-byte length prefix
+					let length_bytes = (h.as_ref().len() as u64).to_le_bytes();
+					output.extend_from_slice(&length_bytes);
+					output.extend_from_slice(h.as_ref());
 					true
 				},
 				&Some(ChildReference::Inline(inline_data, len)) => {
-					inline_data.as_ref()[..len].encode_to(&mut output);
+					// Encode length as 8-byte little-endian
+					let length_bytes = (len as u64).to_le_bytes();
+					output.extend_from_slice(&length_bytes);
+					output.extend_from_slice(&inline_data.as_ref()[..len]);
 					true
 				},
 				None => false,
