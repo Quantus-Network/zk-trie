@@ -23,7 +23,7 @@ use codec::Encode;
 use hash_db::Hasher;
 use trie_root;
 
-const MAX_INLINE_THRESHOLD: usize = FELT_ALIGNED_MAX_INLINE_VALUE as usize;
+const MAX_INLINE_THRESHOLD: usize = 31;
 
 /// Codec-flavored TrieStream.
 #[derive(Default, Clone)]
@@ -115,6 +115,13 @@ impl trie_root::TrieStream for TrieStream {
                 let length_bytes = (value.len() as u64).to_le_bytes();
                 self.buffer.extend_from_slice(&length_bytes);
                 self.buffer.extend_from_slice(value);
+
+                // Pad value data to 8-byte boundary
+                let value_aligned_len = ((value.len() + 7) / 8) * 8;
+                let padding_needed = value_aligned_len - value.len();
+                for _ in 0..padding_needed {
+                    self.buffer.push(0);
+                }
             }
             TrieStreamValue::Node(hash) => {
                 self.buffer.extend_from_slice(hash.as_slice());
@@ -149,6 +156,13 @@ impl trie_root::TrieStream for TrieStream {
                 let length_bytes = (value.len() as u64).to_le_bytes();
                 self.buffer.extend_from_slice(&length_bytes);
                 self.buffer.extend_from_slice(value);
+
+                // Pad value data to 8-byte boundary
+                let value_aligned_len = ((value.len() + 7) / 8) * 8;
+                let padding_needed = value_aligned_len - value.len();
+                for _ in 0..padding_needed {
+                    self.buffer.push(0);
+                }
             }
             Some(TrieStreamValue::Node(hash)) => {
                 self.buffer.extend_from_slice(hash.as_slice());
