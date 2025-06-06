@@ -619,7 +619,7 @@ where
 
 /// Constants used into trie simplification codec.
 mod trie_constants {
-    pub const EMPTY_TRIE: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]; // 8-byte null header for new format
+    pub const EMPTY_TRIE: u64 = 0x00000000_00000000; // 8-byte null header for new format
     pub const ESCAPE_COMPACT_HEADER: u8 = 0x01; // Update since EMPTY_TRIE is now an array
 }
 
