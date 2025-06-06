@@ -1,2 +1,28 @@
-style_edition = "2021"
+# rustfmt.toml – strict, deterministic
+
 edition = "2021"
+newline_style = "Unix"             # LF everywhere
+max_width = 120                    # pick one width and stick to it
+hard_tabs = false                  # always spaces
+use_small_heuristics = "Off"       # no width-based “look nice” tricks
+imports_granularity = "Crate"      # collapse to `use foo::{a, b};`
+group_imports = "StdExternalCrate"
+reorder_imports = true
+blank_lines_upper_bound = 0        # never more than one blank line
+
+format_code_in_doc_comments = true
+# “format EVERYTHING” switches
+format_strings = true
+format_macro_bodies = true
+format_macro_matchers = true
+
+normalize_doc_attributes = true
+normalize_comments = true
+wrap_comments = true
+# Derive & attribute hygiene
+merge_derives = true
+hex_literal_case = "Upper"
+trailing_semicolon = true
+
+# Required when using any 🅧 option
+unstable_features = true
