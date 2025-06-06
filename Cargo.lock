@@ -2566,6 +2566,7 @@ dependencies = [
  "array-bytes",
  "criterion",
  "hash-db",
+ "log",
  "memory-db",
  "nohash-hasher",
  "parity-scale-codec",

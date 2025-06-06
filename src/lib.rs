@@ -99,10 +99,14 @@ where
         A: AsRef<[u8]> + Ord,
         B: AsRef<[u8]>,
     {
-        trie_root::trie_root_no_extension::<H, TrieStream, _, _, _>(
-            input,
+        let input_vec: Vec<_> = input.into_iter().collect();
+        log::debug!(target: "zk-trie", "LayoutV1::trie_root input length: {}", input_vec.len());
+        let result = trie_root::trie_root_no_extension::<H, TrieStream, _, _, _>(
+            input_vec,
             Some(FELT_ALIGNED_MAX_INLINE_VALUE),
-        )
+        );
+        log::debug!(target: "zk-trie", "LayoutV1::trie_root result: {:02x?}", result.as_ref());
+        result
     }
 
     fn trie_root_unhashed<I, A, B>(input: I) -> Vec<u8>
@@ -111,10 +115,14 @@ where
         A: AsRef<[u8]> + Ord,
         B: AsRef<[u8]>,
     {
-        trie_root::unhashed_trie_no_extension::<H, TrieStream, _, _, _>(
-            input,
+        let input_vec: Vec<_> = input.into_iter().collect();
+        log::debug!(target: "zk-trie", "LayoutV1::trie_root_unhashed input length: {}", input_vec.len());
+        let result = trie_root::unhashed_trie_no_extension::<H, TrieStream, _, _, _>(
+            input_vec,
             Some(FELT_ALIGNED_MAX_INLINE_VALUE),
-        )
+        );
+        log::debug!(target: "zk-trie", "LayoutV1::trie_root_unhashed result: {:02x?}", result);
+        result
     }
 
     fn encode_index(input: u32) -> Vec<u8> {
@@ -376,7 +384,10 @@ pub fn read_trie_value_with<
 
 /// Determine the empty trie root.
 pub fn empty_trie_root<L: TrieConfiguration>() -> <L::Hash as Hasher>::Out {
-    L::trie_root::<_, Vec<u8>, Vec<u8>>(core::iter::empty())
+    log::debug!(target: "zk-trie", "empty_trie_root called");
+    let result = L::trie_root::<_, Vec<u8>, Vec<u8>>(core::iter::empty());
+    log::debug!(target: "zk-trie", "empty_trie_root result: {:02x?}", result.as_ref());
+    result
 }
 
 /// Determine the empty child trie root.

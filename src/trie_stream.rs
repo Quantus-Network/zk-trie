@@ -100,7 +100,9 @@ impl trie_root::TrieStream for TrieStream {
     }
 
     fn append_empty_data(&mut self) {
+        log::debug!(target: "zk-trie", "TrieStream::append_empty_data called, EMPTY_TRIE: {:02x?}", &trie_constants::EMPTY_TRIE);
         self.buffer.extend_from_slice(&trie_constants::EMPTY_TRIE);
+        log::debug!(target: "zk-trie", "TrieStream::append_empty_data buffer after: {:02x?}", &self.buffer);
     }
 
     fn append_leaf(&mut self, key: &[u8], value: TrieStreamValue) {
@@ -194,6 +196,7 @@ impl trie_root::TrieStream for TrieStream {
     }
 
     fn out(self) -> Vec<u8> {
+        log::debug!(target: "zk-trie", "TrieStream::out returning buffer: {:02x?}", &self.buffer);
         self.buffer
     }
 }
