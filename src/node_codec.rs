@@ -20,7 +20,7 @@
 use super::node_header::{NodeHeader, NodeKind};
 use crate::{error::Error, trie_constants};
 use alloc::{borrow::Borrow, vec::Vec};
-use codec::{Compact, Decode, Encode, Input};
+use codec::{Decode, Encode, Input};
 use core::{marker::PhantomData, ops::Range};
 use hash_db::Hasher;
 use trie_db::{

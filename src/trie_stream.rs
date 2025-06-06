@@ -17,9 +17,8 @@
 
 //! `TrieStream` implementation for Substrate's trie format.
 
-use crate::{node_header::NodeKind, trie_constants, FELT_ALIGNED_MAX_INLINE_VALUE};
+use crate::{node_header::NodeKind, trie_constants};
 use alloc::vec::Vec;
-use codec::Encode;
 use hash_db::Hasher;
 use trie_root;
 

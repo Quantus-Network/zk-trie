@@ -18,7 +18,6 @@
 //! The node header.
 
 use codec::{Decode, Encode, Input, Output};
-use core::iter::once;
 
 /// A node header
 #[derive(Copy, Clone, PartialEq, Eq, sp_core::RuntimeDebug)]
@@ -97,65 +96,4 @@ impl Decode for NodeHeader {
     }
 }
 
-/// Returns an iterator over encoded bytes for node header and size.
-/// Size encoding allows unlimited, length inefficient, representation, but
-/// is bounded to 16 bit maximum value to avoid possible DOS.
-pub(crate) fn size_and_prefix_iterator(
-    size: usize,
-    prefix: u8,
-    prefix_mask: usize,
-) -> impl Iterator<Item = u8> {
-    let max_value = 255u8 >> prefix_mask;
-    let l1 = core::cmp::min((max_value as usize).saturating_sub(1), size);
-    let (first_byte, mut rem) = if size == l1 {
-        (once(prefix + l1 as u8), 0)
-    } else {
-        (once(prefix + max_value as u8), size - l1)
-    };
-    let next_bytes = move || {
-        if rem > 0 {
-            if rem < 256 {
-                let result = rem - 1;
-                rem = 0;
-                Some(result as u8)
-            } else {
-                rem = rem.saturating_sub(255);
-                Some(255)
-            }
-        } else {
-            None
-        }
-    };
-    first_byte.chain(core::iter::from_fn(next_bytes))
-}
 
-/// Encodes size and prefix to a stream output.
-fn encode_size_and_prefix<W>(size: usize, prefix: u8, prefix_mask: usize, out: &mut W)
-where
-    W: Output + ?Sized,
-{
-    for b in size_and_prefix_iterator(size, prefix, prefix_mask) {
-        out.push_byte(b)
-    }
-}
-
-/// Decode size only from stream input and header byte.
-fn decode_size(
-    first: u8,
-    input: &mut impl Input,
-    prefix_mask: usize,
-) -> Result<usize, codec::Error> {
-    let max_value = 255u8 >> prefix_mask;
-    let mut result = (first & max_value) as usize;
-    if result < max_value as usize {
-        return Ok(result);
-    }
-    result -= 1;
-    loop {
-        let n = input.read_byte()? as usize;
-        if n < 255 {
-            return Ok(result + n + 1);
-        }
-        result += 255;
-    }
-}
