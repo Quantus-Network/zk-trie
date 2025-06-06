@@ -1,0 +1,9 @@
+name: rustfmt
+on: [pull_request, push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show  # proves the pinned toolchain is used
+      - run: cargo fmt --all -- --check
