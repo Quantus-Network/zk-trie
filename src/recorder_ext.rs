@@ -1,8 +1,6 @@
 // This file is part of Substrate.
-
 // Copyright (C) Parity Technologies (UK) Ltd.
 // SPDX-License-Identifier: Apache-2.0
-
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,13 +12,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 //! Extension for the default recorder.
-
-use crate::RawStorageProof;
 use alloc::{collections::BTreeSet, vec::Vec};
+
 use trie_db::{Recorder, TrieLayout};
 
+use crate::RawStorageProof;
 /// Convenience extension for the `Recorder` struct.
 ///
 /// Used to deduplicate some logic.
@@ -30,7 +27,6 @@ where
 {
     /// Convert the recorder into a `BTreeSet`.
     fn into_set(self) -> BTreeSet<Vec<u8>>;
-
     /// Convert the recorder into a `RawStorageProof`, avoiding duplicate nodes.
     fn into_raw_storage_proof(self) -> RawStorageProof {
         // The recorder may record the same trie node multiple times,
@@ -39,12 +35,8 @@ where
         self.into_set().into_iter().collect()
     }
 }
-
 impl<L: TrieLayout> RecorderExt<L> for Recorder<L> {
     fn into_set(mut self) -> BTreeSet<Vec<u8>> {
-        self.drain()
-            .into_iter()
-            .map(|record| record.data)
-            .collect::<BTreeSet<_>>()
+        self.drain().into_iter().map(|record| record.data).collect::<BTreeSet<_>>()
     }
 }

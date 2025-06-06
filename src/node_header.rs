@@ -1,8 +1,6 @@
 // This file is part of Substrate.
-
 // Copyright (C) Parity Technologies (UK) Ltd.
 // SPDX-License-Identifier: Apache-2.0
-
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,11 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 //! The node header.
-
 use codec::{Decode, Encode, Input, Output};
-
 /// A node header
 #[derive(Copy, Clone, PartialEq, Eq, sp_core::RuntimeDebug)]
 pub(crate) enum NodeHeader {
@@ -32,16 +27,11 @@ pub(crate) enum NodeHeader {
     // contains nibble count.
     HashedValueLeaf(usize),
 }
-
 impl NodeHeader {
     pub(crate) fn contains_hash_of_value(&self) -> bool {
-        matches!(
-            self,
-            NodeHeader::HashedValueBranch(_) | NodeHeader::HashedValueLeaf(_)
-        )
+        matches!(self, NodeHeader::HashedValueBranch(_) | NodeHeader::HashedValueLeaf(_))
     }
 }
-
 /// NodeHeader without content
 pub(crate) enum NodeKind {
     Leaf,
@@ -50,7 +40,6 @@ pub(crate) enum NodeKind {
     HashedValueLeaf,
     HashedValueBranch,
 }
-
 impl Encode for NodeHeader {
     fn encode_to<T: Output + ?Sized>(&self, output: &mut T) {
         let value: u64 = match self {
@@ -74,9 +63,7 @@ impl Encode for NodeHeader {
         output.write(&value.to_le_bytes());
     }
 }
-
 impl codec::EncodeLike for NodeHeader {}
-
 impl Decode for NodeHeader {
     fn decode<I: Input>(input: &mut I) -> Result<Self, codec::Error> {
         let mut bytes = [0u8; 8];
