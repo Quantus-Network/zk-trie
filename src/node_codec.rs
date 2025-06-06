@@ -98,13 +98,13 @@ where
 
     fn decode_plan(data: &[u8]) -> Result<NodePlan, Self::Error> {
         log::debug!(target: "zk-trie", "NodeCodec::decode_plan called with data: {:02x?}", data);
-        
+
         // Handle empty data
         if data.is_empty() {
             log::debug!(target: "zk-trie", "NodeCodec::decode_plan: empty data, returning Empty node plan");
             return Ok(NodePlan::Empty);
         }
-        
+
         // Handle the case where we're trying to decode a hash value instead of actual trie data
         // This happens when the empty trie root hash is incorrectly treated as stored trie data
         if data.len() == H::LENGTH {
@@ -114,19 +114,19 @@ where
                 return Ok(NodePlan::Empty);
             }
         }
-        
+
         // Handle legacy single-byte empty trie representation
         if data.len() == 1 && data[0] == 0 {
             log::debug!(target: "zk-trie", "NodeCodec::decode_plan: detected legacy single-byte empty trie, returning Empty node plan");
             return Ok(NodePlan::Empty);
         }
-        
+
         // Handle any other cases where data is too short for our 8-byte header format
         if data.len() < 8 {
             log::debug!(target: "zk-trie", "NodeCodec::decode_plan: data too short ({}), treating as empty trie", data.len());
             return Ok(NodePlan::Empty);
         }
-        
+
         let mut input = ByteSliceInput::new(data);
         let header = NodeHeader::decode(&mut input)?;
         let contains_hash = header.contains_hash_of_value();

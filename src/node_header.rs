@@ -95,5 +95,3 @@ impl Decode for NodeHeader {
         }
     }
 }
-
-

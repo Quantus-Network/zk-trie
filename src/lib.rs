@@ -892,7 +892,7 @@ mod tests {
                 min_key: 5,
                 journal_key: 0,
                 value_mode: ValueMode::Index,
-                count: 10,  // Reduced count for faster testing
+                count: 10, // Reduced count for faster testing
             }
             .make_with(seed.as_fixed_bytes_mut());
 
@@ -901,7 +901,10 @@ mod tests {
             check_8_byte_alignment(&unhashed_root, 0, "root");
 
             // Test storage proof alignment (the critical path)
-            let x_refs: Vec<_> = x.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+            let x_refs: Vec<_> = x
+                .iter()
+                .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                .collect();
             let (db, root) = create_trie::<L>(&x_refs);
             let proof_keys: Vec<_> = x.iter().map(|(k, _)| k.clone()).collect();
             if let Ok(proof) = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys) {
@@ -931,69 +934,97 @@ mod tests {
     fn storage_proof_8_byte_alignment_inner<L: TrieConfiguration>() {
         use crate::StorageProof;
         use rand::Rng;
-        
+
         let mut rng = rand::thread_rng();
         let mut total_proof_nodes = 0;
-        
+
         // Test 1: Random data test (no verbose output)
         for iteration in 0..10 {
             let num_entries = rng.gen_range(5..20);
             let mut test_data = Vec::new();
-            
+
             for i in 0..num_entries {
                 let key_len = rng.gen_range(1..=200);
                 let mut key = vec![0u8; key_len];
                 rng.fill(&mut key[..]);
                 key[0] = (iteration as u8).wrapping_add(i as u8);
-                
+
                 let value_len = rng.gen_range(0..=100);
                 let mut value = vec![0u8; value_len];
                 rng.fill(&mut value[..]);
-                
+
                 test_data.push((key, value));
             }
-            
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
+
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
             let proof_keys: Vec<Vec<u8>> = test_data.iter().map(|(k, _)| k.clone()).collect();
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys).unwrap();
-            
+
             total_proof_nodes += proof.len();
-            
+
             // Verify ALL proof nodes are 8-byte aligned
             for node in &proof {
-                assert_eq!(node.len() % 8, 0, "Storage proof node not 8-byte aligned: length {}", node.len());
+                assert_eq!(
+                    node.len() % 8,
+                    0,
+                    "Storage proof node not 8-byte aligned: length {}",
+                    node.len()
+                );
             }
-            
+
             // Test storage proof reconstruction
             let storage_proof = StorageProof::new(proof.clone());
             let mut proof_db = storage_proof.into_memory_db::<L::Hash>();
-            
+
             for (_, (node_data, _)) in proof_db.drain() {
-                assert_eq!(node_data.len() % 8, 0, "Reconstructed proof node not 8-byte aligned: length {}", node_data.len());
+                assert_eq!(
+                    node_data.len() % 8,
+                    0,
+                    "Reconstructed proof node not 8-byte aligned: length {}",
+                    node_data.len()
+                );
             }
-            
+
             // Verify proof works correctly
-            let items_to_verify: Vec<_> = test_data.iter().map(|(k, v)| (k.as_slice(), Some(v.as_slice()))).collect();
+            let items_to_verify: Vec<_> = test_data
+                .iter()
+                .map(|(k, v)| (k.as_slice(), Some(v.as_slice())))
+                .collect();
             crate::verify_trie_proof::<L, _, _, _>(&root, &proof, &items_to_verify).unwrap();
         }
 
         // Test 2: Edge cases
         let edge_cases = vec![
-            (vec![42u8; 10], vec![]),                    // Empty value
-            (vec![43u8; 1], vec![1u8]),                  // Tiny value
-            (vec![45u8; 5], vec![2u8; 23]),              // Just under 24-byte threshold
-            (vec![46u8; 6], vec![3u8; 24]),              // Exactly at threshold
-            (vec![47u8; 7], vec![4u8; 25]),              // Just over threshold
-            (vec![48u8; 100], vec![5u8; 200]),           // Large key and value
+            (vec![42u8; 10], vec![]),          // Empty value
+            (vec![43u8; 1], vec![1u8]),        // Tiny value
+            (vec![45u8; 5], vec![2u8; 23]),    // Just under 24-byte threshold
+            (vec![46u8; 6], vec![3u8; 24]),    // Exactly at threshold
+            (vec![47u8; 7], vec![4u8; 25]),    // Just over threshold
+            (vec![48u8; 100], vec![5u8; 200]), // Large key and value
         ];
-        
+
         for (key, value) in edge_cases {
             let test_data = vec![(key.clone(), value.clone())];
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &[&key]).unwrap();
-            
+
             for node in &proof {
-                assert_eq!(node.len() % 8, 0, "Edge case node not 8-byte aligned: length {}", node.len());
+                assert_eq!(
+                    node.len() % 8,
+                    0,
+                    "Edge case node not 8-byte aligned: length {}",
+                    node.len()
+                );
             }
         }
 
@@ -1005,33 +1036,47 @@ mod tests {
                 let value = vec![200u8 + i; rng.gen_range(1..50)];
                 test_data.push((key, value));
             }
-            
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
-            
+
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
+
             let non_existent_keys = vec![vec![250u8; 10], vec![251u8; 20]];
-            let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &non_existent_keys).unwrap();
-            
+            let proof =
+                crate::generate_trie_proof::<L, _, _, _>(&db, root, &non_existent_keys).unwrap();
+
             for node in &proof {
-                assert_eq!(node.len() % 8, 0, "Non-inclusion proof node not 8-byte aligned: length {}", node.len());
+                assert_eq!(
+                    node.len() % 8,
+                    0,
+                    "Non-inclusion proof node not 8-byte aligned: length {}",
+                    node.len()
+                );
             }
         }
 
         println!("✅ Storage proof 8-byte alignment verification PASSED!");
-        println!("   ✓ {} total proof nodes verified (all 8-byte aligned)", total_proof_nodes);
+        println!(
+            "   ✓ {} total proof nodes verified (all 8-byte aligned)",
+            total_proof_nodes
+        );
         println!("   ✓ Random data tests passed");
         println!("   ✓ Edge case tests passed");
         println!("   ✓ Non-inclusion proof tests passed");
     }
 
     fn child_reference_8_byte_boundary_inner<L: TrieConfiguration>() {
-        use rand::Rng;
         use crate::NodeCodec;
+        use rand::Rng;
         use trie_db::NodeCodec as NodeCodecT;
-        
+
         let mut rng = rand::thread_rng();
         let mut nodes_checked = 0;
         let mut child_refs_checked = 0;
-        
+
         println!("Checking child reference positioning at 8-byte boundaries...");
 
         // Test with a few specific cases to create branch nodes
@@ -1054,21 +1099,30 @@ mod tests {
         ];
 
         for test_data in test_cases {
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
-            
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
+
             // Generate storage proof to get encoded nodes
             let proof_keys: Vec<Vec<u8>> = test_data.iter().map(|(k, _)| k.clone()).collect();
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys).unwrap();
-            
+
             // Analyze each proof node for child reference positioning
             for node_data in &proof {
                 if let Ok(node_plan) = NodeCodec::<L::Hash>::decode_plan(node_data) {
                     nodes_checked += 1;
-                    
+
                     match node_plan {
                         trie_db::node::NodePlan::NibbledBranch { children, .. } => {
                             // This is a branch node - check child reference positions
-                            check_branch_node_child_positions::<L>(node_data, &children, &mut child_refs_checked);
+                            check_branch_node_child_positions::<L>(
+                                node_data,
+                                &children,
+                                &mut child_refs_checked,
+                            );
                         }
                         _ => {} // Other node types don't have child references
                     }
@@ -1078,23 +1132,26 @@ mod tests {
 
         println!("✅ Child reference boundary verification PASSED!");
         println!("   ✓ {} nodes analyzed", nodes_checked);
-        println!("   ✓ {} child references verified at 8-byte boundaries", child_refs_checked);
+        println!(
+            "   ✓ {} child references verified at 8-byte boundaries",
+            child_refs_checked
+        );
     }
 
     fn check_branch_node_child_positions<L: TrieConfiguration>(
-        node_data: &[u8], 
-        children: &[Option<trie_db::node::NodeHandlePlan>; 16], 
-        child_refs_checked: &mut usize
+        node_data: &[u8],
+        children: &[Option<trie_db::node::NodeHandlePlan>; 16],
+        child_refs_checked: &mut usize,
     ) {
-        use trie_db::NodeCodec as NodeCodecT;
         use crate::NodeCodec;
-        
+        use trie_db::NodeCodec as NodeCodecT;
+
         // Parse the node structure manually to verify positioning
         let mut cursor = 0;
-        
+
         // Skip header (8 bytes)
         cursor += 8;
-        
+
         // Skip partial key data (felt-aligned)
         if let Ok(node_plan) = NodeCodec::<L::Hash>::decode_plan(node_data) {
             if let trie_db::node::NodePlan::NibbledBranch { partial, value, .. } = node_plan {
@@ -1103,10 +1160,10 @@ mod tests {
                 let nibble_bytes = (nibble_count + 1) / 2;
                 let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
                 cursor += felt_aligned_bytes;
-                
+
                 // Skip bitmap (8 bytes)
                 cursor += 8;
-                
+
                 // Skip value if present
                 if value.is_some() {
                     match value {
@@ -1124,7 +1181,7 @@ mod tests {
                         None => {}
                     }
                 }
-                
+
                 // Now check child reference positions
                 for (i, child) in children.iter().enumerate() {
                     if child.is_some() {
@@ -1136,9 +1193,9 @@ mod tests {
                                 i, cursor, node_data.len(), cursor
                             );
                         }
-                        
+
                         *child_refs_checked += 1;
-                        
+
                         // Skip over this child reference
                         cursor += 8; // 8-byte length prefix
                         match child {
@@ -1158,7 +1215,12 @@ mod tests {
 
     fn check_8_byte_alignment(data: &[u8], offset: usize, context: &str) {
         if data.len() % 8 != 0 {
-            println!("❌ {} at offset {} has length {} (not 8-byte aligned)", context, offset, data.len());
+            println!(
+                "❌ {} at offset {} has length {} (not 8-byte aligned)",
+                context,
+                offset,
+                data.len()
+            );
             println!("Data: {:?}", data);
             panic!("8-byte alignment violation in {}", context);
         }
