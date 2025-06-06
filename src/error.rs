@@ -26,9 +26,11 @@ pub enum Error<H> {
     #[cfg_attr(feature = "std", error("Decoding failed: {0}"))]
     Decode(#[cfg_attr(feature = "std", source)] codec::Error),
     #[cfg_attr(
-		feature = "std",
-		error("Recorded key ({0:x?}) access with value as found={1}, but could not confirm with trie.")
-	)]
+        feature = "std",
+        error(
+            "Recorded key ({0:x?}) access with value as found={1}, but could not confirm with trie."
+        )
+    )]
     InvalidRecording(Vec<u8>, bool),
     #[cfg_attr(feature = "std", error("Trie error: {0:?}"))]
     TrieError(Box<trie_db::TrieError<H, Self>>),
