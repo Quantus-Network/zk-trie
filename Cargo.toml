@@ -37,6 +37,7 @@ schnellru = { version = "0.2.3", optional = true }
 
 [patch.crates-io]
 sp-trie = { path = "." }
+sp-state-machine = { path = "../zk-state-machine" }
 
 [dev-dependencies]
 array-bytes = { version = "6.2.2", default-features = true }
