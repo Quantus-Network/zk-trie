@@ -21,9 +21,8 @@
 //! it to substrate specific layout and child trie system.
 
 use crate::{CompactProof, HashDBT, TrieConfiguration, TrieHash, EMPTY_PREFIX};
-use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
-use hash_db::{HashDBRef, Hasher};
-use trie_db::{CError, NodeCodec, Trie};
+use alloc::{boxed::Box, vec::Vec};
+use trie_db::{CError, Trie};
 
 /// Error for trie node decoding.
 #[derive(Debug)]
@@ -211,5 +210,3 @@ where
         encoded_nodes: compact_proof,
     })
 }
-
-
