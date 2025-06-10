@@ -165,13 +165,12 @@ where
                         length_array.copy_from_slice(length_bytes);
                         let count = u64::from_le_bytes(length_array) as usize;
                         
-                        // All children must be hashes (32 bytes) in zk-trie - no inline children
-                        if count != H::LENGTH {
-                            return Err(Error::BadFormat);
-                        }
-                        
-                        let range = input.take(H::LENGTH)?;
-                        children[i] = Some(NodeHandlePlan::Hash(range));
+                        let range = input.take(count)?;
+                        children[i] = Some(if count == H::LENGTH {
+                            NodeHandlePlan::Hash(range)
+                        } else {
+                            NodeHandlePlan::Inline(range)
+                        });
                     }
                 }
                 Ok(NodePlan::NibbledBranch {

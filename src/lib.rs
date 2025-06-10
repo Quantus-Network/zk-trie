@@ -213,6 +213,11 @@ impl<H: Hasher> PrefixedMemoryDB<H> {
 		Self(memory_db::MemoryDB::new(prefix))
 	}
 
+	pub fn default_with_root() -> (Self, H::Out) {
+		let (inner_db, root) = memory_db::MemoryDB::default_with_root();
+		(Self(inner_db), root)
+	}
+
 	pub fn consolidate(&mut self, other: Self) {
 		self.0.consolidate(other.0)
 	}
@@ -230,14 +235,14 @@ impl<H: Hasher> Default for PrefixedMemoryDB<H> {
 	}
 }
 
-impl<H: Hasher> std::ops::Deref for PrefixedMemoryDB<H> {
+impl<H: Hasher> core::ops::Deref for PrefixedMemoryDB<H> {
 	type Target = memory_db::MemoryDB<H, memory_db::PrefixedKey<H>, trie_db::DBValue>;
 	fn deref(&self) -> &Self::Target {
 		&self.0
 	}
 }
 
-impl<H: Hasher> std::ops::DerefMut for PrefixedMemoryDB<H> {
+impl<H: Hasher> core::ops::DerefMut for PrefixedMemoryDB<H> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.0
 	}
@@ -321,14 +326,14 @@ impl<H: Hasher> Default for MemoryDB<H> {
 	}
 }
 
-impl<H: Hasher> std::ops::Deref for MemoryDB<H> {
+impl<H: Hasher> core::ops::Deref for MemoryDB<H> {
 	type Target = memory_db::MemoryDB<H, memory_db::HashKey<H>, trie_db::DBValue>;
 	fn deref(&self) -> &Self::Target {
 		&self.0
 	}
 }
 
-impl<H: Hasher> std::ops::DerefMut for MemoryDB<H> {
+impl<H: Hasher> core::ops::DerefMut for MemoryDB<H> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.0
 	}
@@ -1107,47 +1112,47 @@ mod tests {
     fn storage_proof_8_byte_alignment_inner<L: TrieConfiguration>() {
         use crate::StorageProof;
         use rand::Rng;
-        
+
         let mut rng = rand::thread_rng();
         let mut total_proof_nodes = 0;
-        
+
         // Test 1: Random data test (no verbose output)
         for iteration in 0..10 {
             let num_entries = rng.gen_range(5..20);
             let mut test_data = Vec::new();
-            
+
             for i in 0..num_entries {
                 let key_len = rng.gen_range(1..=200);
                 let mut key = vec![0u8; key_len];
                 rng.fill(&mut key[..]);
                 key[0] = (iteration as u8).wrapping_add(i as u8);
-                
+
                 let value_len = rng.gen_range(0..=100);
                 let mut value = vec![0u8; value_len];
                 rng.fill(&mut value[..]);
-                
+
                 test_data.push((key, value));
             }
-            
+
             let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
             let proof_keys: Vec<Vec<u8>> = test_data.iter().map(|(k, _)| k.clone()).collect();
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys).unwrap();
-            
+
             total_proof_nodes += proof.len();
-            
+
             // Verify ALL proof nodes are 8-byte aligned
             for node in &proof {
                 assert_eq!(node.len() % 8, 0, "Storage proof node not 8-byte aligned: length {}", node.len());
             }
-            
+
             // Test storage proof reconstruction
             let storage_proof = StorageProof::new(proof.clone());
             let mut proof_db = storage_proof.into_memory_db::<L::Hash>();
-            
+
             for (_, (node_data, _)) in proof_db.drain() {
                 assert_eq!(node_data.len() % 8, 0, "Reconstructed proof node not 8-byte aligned: length {}", node_data.len());
             }
-            
+
             // Verify proof works correctly
             let items_to_verify: Vec<_> = test_data.iter().map(|(k, v)| (k.as_slice(), Some(v.as_slice()))).collect();
             crate::verify_trie_proof::<L, _, _, _>(&root, &proof, &items_to_verify).unwrap();
@@ -1162,12 +1167,12 @@ mod tests {
             (vec![47u8; 7], vec![4u8; 25]),              // Just over threshold
             (vec![48u8; 100], vec![5u8; 200]),           // Large key and value
         ];
-        
+
         for (key, value) in edge_cases {
             let test_data = vec![(key.clone(), value.clone())];
             let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &[&key]).unwrap();
-            
+
             for node in &proof {
                 assert_eq!(node.len() % 8, 0, "Edge case node not 8-byte aligned: length {}", node.len());
             }
@@ -1181,12 +1186,12 @@ mod tests {
                 let value = vec![200u8 + i; rng.gen_range(1..50)];
                 test_data.push((key, value));
             }
-            
+
             let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
-            
+
             let non_existent_keys = vec![vec![250u8; 10], vec![251u8; 20]];
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &non_existent_keys).unwrap();
-            
+
             for node in &proof {
                 assert_eq!(node.len() % 8, 0, "Non-inclusion proof node not 8-byte aligned: length {}", node.len());
             }
@@ -1203,11 +1208,11 @@ mod tests {
         use rand::Rng;
         use crate::NodeCodec;
         use trie_db::NodeCodec as NodeCodecT;
-        
+
         let mut rng = rand::thread_rng();
         let mut nodes_checked = 0;
         let mut child_refs_checked = 0;
-        
+
         println!("Checking child reference positioning at 8-byte boundaries...");
 
         // Test with a few specific cases to create branch nodes
@@ -1231,16 +1236,16 @@ mod tests {
 
         for test_data in test_cases {
             let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
-            
+
             // Generate storage proof to get encoded nodes
             let proof_keys: Vec<Vec<u8>> = test_data.iter().map(|(k, _)| k.clone()).collect();
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys).unwrap();
-            
+
             // Analyze each proof node for child reference positioning
             for node_data in &proof {
                 if let Ok(node_plan) = NodeCodec::<L::Hash>::decode_plan(node_data) {
                     nodes_checked += 1;
-                    
+
                     match node_plan {
                         trie_db::node::NodePlan::NibbledBranch { children, .. } => {
                             // This is a branch node - check child reference positions
@@ -1258,19 +1263,19 @@ mod tests {
     }
 
     fn check_branch_node_child_positions<L: TrieConfiguration>(
-        node_data: &[u8], 
-        children: &[Option<trie_db::node::NodeHandlePlan>; 16], 
+        node_data: &[u8],
+        children: &[Option<trie_db::node::NodeHandlePlan>; 16],
         child_refs_checked: &mut usize
     ) {
         use trie_db::NodeCodec as NodeCodecT;
         use crate::NodeCodec;
-        
+
         // Parse the node structure manually to verify positioning
         let mut cursor = 0;
-        
+
         // Skip header (8 bytes)
         cursor += 8;
-        
+
         // Skip partial key data (felt-aligned)
         if let Ok(node_plan) = NodeCodec::<L::Hash>::decode_plan(node_data) {
             if let trie_db::node::NodePlan::NibbledBranch { partial, value, .. } = node_plan {
@@ -1279,10 +1284,10 @@ mod tests {
                 let nibble_bytes = (nibble_count + 1) / 2;
                 let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
                 cursor += felt_aligned_bytes;
-                
+
                 // Skip bitmap (8 bytes)
                 cursor += 8;
-                
+
                 // Skip value if present
                 if value.is_some() {
                     match value {
@@ -1300,7 +1305,7 @@ mod tests {
                         None => {}
                     }
                 }
-                
+
                 // Now check child reference positions
                 for (i, child) in children.iter().enumerate() {
                     if child.is_some() {
@@ -1312,9 +1317,9 @@ mod tests {
                                 i, cursor, node_data.len(), cursor
                             );
                         }
-                        
+
                         *child_refs_checked += 1;
-                        
+
                         // Skip over this child reference
                         cursor += 8; // 8-byte length prefix
                         match child {
@@ -1821,14 +1826,14 @@ mod tests {
     fn test_reproduce_incomplete_database_scenarios_inner<L: TrieConfiguration>() {
         use memory_db::{MemoryDB, HashKey};
         use trie_db::{TrieDBMutBuilder, TrieMut};
-        
+
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut root = Default::default();
-        
+
         // Test inserting the exact problematic data from failing tests
         {
             let mut trie = TrieDBMutBuilder::<L>::new(&mut memdb, &mut root).build();
-            
+
             // These are the exact insertions that were failing in the balance tests
             trie.insert(b"value3", &[142; 33]).expect("insert failed - 33 byte array");
             trie.insert(b"value4", &[124; 33]).expect("insert failed - 33 byte array");
@@ -1836,13 +1841,13 @@ mod tests {
             trie.insert(b"value1", &[42]).expect("insert failed - 1 byte");
             trie.insert(b"value2", &[24]).expect("insert failed - 1 byte");
             trie.insert(b":code", b"return 42").expect("insert failed - code string");
-            
+
             // Insert range like in the failing tests
             for i in 128u8..255u8 {
                 trie.insert(&[i], &[i]).expect(&format!("insert failed for {}", i));
             }
         }
-        
+
         // Verify we can read everything back
         let trie = trie_db::TrieDBBuilder::<L>::new(&memdb, &root).build();
         assert_eq!(trie.get(b"value3").unwrap(), Some(vec![142; 33]));
@@ -1864,49 +1869,49 @@ mod tests {
         use memory_db::{MemoryDB, HashKey, PrefixedKey};
         use trie_db::{TrieDBMutBuilder, TrieMut};
         use codec::Encode;
-        
+
         // Step 1: Build a child trie (mimicking the test_db pattern)
         let mut child_memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut child_root = Default::default();
-        
+
         {
             let mut child_trie = TrieDBMutBuilder::<L>::new(&mut child_memdb, &mut child_root).build();
             child_trie.insert(b"value3", &[142; 33]).expect("child insert failed");
             child_trie.insert(b"value4", &[124; 33]).expect("child insert failed");
         }
-        
+
         // Step 2: Encode the child root like in the failing test
         let sub_root = child_root.as_ref().to_vec();
-        
+
         // Step 3: Insert the child root as a value in a main trie
         let mut main_memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut main_root = Default::default();
-        
+
         {
             let mut main_trie = TrieDBMutBuilder::<L>::new(&mut main_memdb, &mut main_root).build();
-            
+
             // This pattern was causing IncompleteDatabase errors
             let child_storage_key = b":child_storage_default:child";
             main_trie.insert(child_storage_key, &sub_root).expect("main trie insert of child root failed");
-            
+
             // Add other data like in the failing test
             main_trie.insert(b"key", b"value").expect("insert failed");
             main_trie.insert(b"value1", &[42]).expect("insert failed");
             main_trie.insert(b"value2", &[24]).expect("insert failed");
             main_trie.insert(b":code", b"return 42").expect("insert failed");
-            
+
             for i in 128u8..255u8 {
                 main_trie.insert(&[i], &[i]).expect(&format!("insert failed for {}", i));
             }
         }
-        
+
         // Verify we can read the child root back
         let main_trie = trie_db::TrieDBBuilder::<L>::new(&main_memdb, &main_root).build();
         let stored_child_root = main_trie.get(b":child_storage_default:child").unwrap();
         assert_eq!(stored_child_root, Some(sub_root));
     }
 
-    #[test] 
+    #[test]
     fn test_unaligned_value_insertion_edge_cases() {
         test_unaligned_value_insertion_edge_cases_inner::<LayoutV1>();
         test_unaligned_value_insertion_edge_cases_inner::<LayoutV0>();
@@ -1915,13 +1920,13 @@ mod tests {
     fn test_unaligned_value_insertion_edge_cases_inner<L: TrieConfiguration>() {
         use memory_db::{MemoryDB, HashKey};
         use trie_db::{TrieDBMutBuilder, TrieMut};
-        
+
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut root = Default::default();
-        
+
         {
             let mut trie = TrieDBMutBuilder::<L>::new(&mut memdb, &mut root).build();
-            
+
             // Test various problematic sizes that aren't 8-byte aligned
             let test_cases = vec![
                 (b"empty".as_slice(), vec![]),                    // 0 bytes
@@ -1934,18 +1939,18 @@ mod tests {
                 (b"thirtythree".as_slice(), vec![142; 33]),       // 33 bytes (like failing test)
                 (b"sixtyfive".as_slice(), vec![200; 65]),         // 65 bytes (64 + 1)
             ];
-            
+
             for (key, value) in &test_cases {
                 trie.insert(key, value).expect(&format!("Failed to insert {} bytes", value.len()));
             }
-            
+
             // Also test the exact pattern from the failing balance tests
             trie.insert(b"balance_key", &[142; 33]).expect("balance-like insert failed");
         }
-        
+
         // Verify round-trip consistency
         let trie = trie_db::TrieDBBuilder::<L>::new(&memdb, &root).build();
-        
+
         let test_cases = vec![
             (b"empty".as_slice(), vec![]),
             (b"one".as_slice(), vec![42]),
@@ -1957,13 +1962,13 @@ mod tests {
             (b"thirtythree".as_slice(), vec![142; 33]),
             (b"sixtyfive".as_slice(), vec![200; 65]),
         ];
-        
+
         for (key, expected_value) in &test_cases {
             let stored_value = trie.get(key).unwrap();
-            assert_eq!(stored_value, Some(expected_value.clone()), 
+            assert_eq!(stored_value, Some(expected_value.clone()),
                       "Round-trip failed for {} byte value", expected_value.len());
         }
-        
+
         assert_eq!(trie.get(b"balance_key").unwrap(), Some(vec![142; 33]));
     }
 
@@ -1977,11 +1982,11 @@ mod tests {
         use crate::NodeCodec;
         use trie_db::NodeCodec as NodeCodecT;
         use trie_db::node::{Value, NodePlan};
-        
+
         // Test round-trip for various problematic value sizes
         let test_values = vec![
             vec![],           // 0 bytes
-            vec![42],         // 1 byte  
+            vec![42],         // 1 byte
             vec![1, 2, 3],    // 3 bytes
             vec![1; 5],       // 5 bytes
             vec![1; 7],       // 7 bytes
@@ -1989,22 +1994,22 @@ mod tests {
             vec![142; 33],    // 33 bytes (from failing test)
             vec![1; 65],      // 65 bytes
         ];
-        
+
         for value in test_values {
             // Test leaf node encoding/decoding
             let encoded = NodeCodec::<L::Hash>::leaf_node(
-                [0xaa].iter().copied(), 
-                2, 
+                [0xaa].iter().copied(),
+                2,
                 Value::Inline(&value)
             );
-            
+
             let decoded = NodeCodec::<L::Hash>::decode_plan(&encoded)
                 .expect(&format!("Failed to decode {} byte value", value.len()));
-            
+
             if let NodePlan::Leaf { value: decoded_value, .. } = decoded {
                 if let trie_db::node::ValuePlan::Inline(range) = decoded_value {
                     let decoded_bytes = &encoded[range];
-                    assert_eq!(decoded_bytes, &value[..], 
+                    assert_eq!(decoded_bytes, &value[..],
                               "Round-trip mismatch for {} byte value", value.len());
                 } else {
                     panic!("Expected inline value for {} bytes", value.len());
@@ -2024,20 +2029,20 @@ mod tests {
     fn test_minimal_single_insert_inner<L: TrieConfiguration>() {
         use memory_db::{MemoryDB, HashKey};
         use trie_db::{TrieDBMutBuilder, TrieMut};
-        
+
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut root = Default::default();
-        
+
         // Try the absolute simplest case first
         {
             let mut trie = TrieDBMutBuilder::<L>::new(&mut memdb, &mut root).build();
-            
+
             // Start with the exact failing case
             println!("Attempting to insert single problematic value...");
             trie.insert(b"value3", &[142; 33]).expect("MINIMAL SINGLE INSERT FAILED");
             println!("✓ Single insert succeeded");
         }
-        
+
         // Verify we can read it back
         let trie = trie_db::TrieDBBuilder::<L>::new(&memdb, &root).build();
         let result = trie.get(b"value3").unwrap();
@@ -2045,7 +2050,7 @@ mod tests {
         println!("✓ Single insert round-trip succeeded");
     }
 
-    #[test] 
+    #[test]
     fn test_progressive_inserts() {
         test_progressive_inserts_inner::<LayoutV1>();
         test_progressive_inserts_inner::<LayoutV0>();
@@ -2054,29 +2059,29 @@ mod tests {
     fn test_progressive_inserts_inner<L: TrieConfiguration>() {
         use memory_db::{MemoryDB, HashKey};
         use trie_db::{TrieDBMutBuilder, TrieMut};
-        
+
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut root = Default::default();
-        
+
         {
             let mut trie = TrieDBMutBuilder::<L>::new(&mut memdb, &mut root).build();
-            
+
             // Insert values one by one to see exactly where it breaks
             println!("Step 1: Inserting value3...");
             trie.insert(b"value3", &[142; 33]).expect("Step 1 failed");
-            
+
             println!("Step 2: Inserting value4...");
             trie.insert(b"value4", &[124; 33]).expect("Step 2 failed");
-            
+
             println!("Step 3: Inserting key...");
             trie.insert(b"key", b"value").expect("Step 3 failed");
-            
+
             println!("Step 4: Inserting value1...");
             trie.insert(b"value1", &[42]).expect("Step 4 failed");
-            
+
             println!("Step 5: Inserting value2...");
             trie.insert(b"value2", &[24]).expect("Step 5 failed");
-            
+
             println!("✓ All progressive inserts succeeded");
         }
     }
