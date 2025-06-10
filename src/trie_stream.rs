@@ -100,7 +100,8 @@ impl trie_root::TrieStream for TrieStream {
 
     fn append_empty_data(&mut self) {
         log::debug!(target: "zk-trie", "TrieStream::append_empty_data called, EMPTY_TRIE: {:02x?}", &trie_constants::EMPTY_TRIE);
-        self.buffer.extend_from_slice(&trie_constants::EMPTY_TRIE);
+        self.buffer
+            .extend_from_slice(&trie_constants::EMPTY_TRIE.to_le_bytes());
         log::debug!(target: "zk-trie", "TrieStream::append_empty_data buffer after: {:02x?}", &self.buffer);
     }
 

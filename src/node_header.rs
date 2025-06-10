@@ -19,6 +19,8 @@
 
 use codec::{Decode, Encode, Input, Output};
 
+use crate::trie_constants;
+
 /// A node header
 #[derive(Copy, Clone, PartialEq, Eq, sp_core::RuntimeDebug)]
 pub(crate) enum NodeHeader {
@@ -50,11 +52,12 @@ pub(crate) enum NodeKind {
     HashedValueLeaf,
     HashedValueBranch,
 }
+use trie_constants::EMPTY_TRIE;
 
 impl Encode for NodeHeader {
     fn encode_to<T: Output + ?Sized>(&self, output: &mut T) {
         let value: u64 = match self {
-            NodeHeader::Null => 0x00000000_00000000, // Type 0
+            NodeHeader::Null => EMPTY_TRIE, // Type 0
             NodeHeader::Branch(true, nibble_count) => {
                 (1u64 << 60) | (*nibble_count as u64) // Type 1
             }
@@ -95,5 +98,3 @@ impl Decode for NodeHeader {
         }
     }
 }
-
-

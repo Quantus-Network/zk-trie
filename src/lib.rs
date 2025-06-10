@@ -800,7 +800,7 @@ where
 
 /// Constants used into trie simplification codec.
 mod trie_constants {
-    pub const EMPTY_TRIE: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]; // 8-byte null header for new format
+    pub const EMPTY_TRIE: u64 = 0x00000000_00000000; // 8-byte null header for new format
     pub const ESCAPE_COMPACT_HEADER: u8 = 0x01; // Update since EMPTY_TRIE is now an array
 }
 
@@ -1073,7 +1073,7 @@ mod tests {
                 min_key: 5,
                 journal_key: 0,
                 value_mode: ValueMode::Index,
-                count: 10,  // Reduced count for faster testing
+                count: 10, // Reduced count for faster testing
             }
             .make_with(seed.as_fixed_bytes_mut());
 
@@ -1082,7 +1082,10 @@ mod tests {
             check_8_byte_alignment(&unhashed_root, 0, "root");
 
             // Test storage proof alignment (the critical path)
-            let x_refs: Vec<_> = x.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+            let x_refs: Vec<_> = x
+                .iter()
+                .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                .collect();
             let (db, root) = create_trie::<L>(&x_refs);
             let proof_keys: Vec<_> = x.iter().map(|(k, _)| k.clone()).collect();
             if let Ok(proof) = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys) {
@@ -1134,7 +1137,12 @@ mod tests {
                 test_data.push((key, value));
             }
 
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
             let proof_keys: Vec<Vec<u8>> = test_data.iter().map(|(k, _)| k.clone()).collect();
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &proof_keys).unwrap();
 
@@ -1142,7 +1150,12 @@ mod tests {
 
             // Verify ALL proof nodes are 8-byte aligned
             for node in &proof {
-                assert_eq!(node.len() % 8, 0, "Storage proof node not 8-byte aligned: length {}", node.len());
+                assert_eq!(
+                    node.len() % 8,
+                    0,
+                    "Storage proof node not 8-byte aligned: length {}",
+                    node.len()
+                );
             }
 
             // Test storage proof reconstruction
@@ -1150,31 +1163,49 @@ mod tests {
             let mut proof_db = storage_proof.into_memory_db::<L::Hash>();
 
             for (_, (node_data, _)) in proof_db.drain() {
-                assert_eq!(node_data.len() % 8, 0, "Reconstructed proof node not 8-byte aligned: length {}", node_data.len());
+                assert_eq!(
+                    node_data.len() % 8,
+                    0,
+                    "Reconstructed proof node not 8-byte aligned: length {}",
+                    node_data.len()
+                );
             }
 
             // Verify proof works correctly
-            let items_to_verify: Vec<_> = test_data.iter().map(|(k, v)| (k.as_slice(), Some(v.as_slice()))).collect();
+            let items_to_verify: Vec<_> = test_data
+                .iter()
+                .map(|(k, v)| (k.as_slice(), Some(v.as_slice())))
+                .collect();
             crate::verify_trie_proof::<L, _, _, _>(&root, &proof, &items_to_verify).unwrap();
         }
 
         // Test 2: Edge cases
         let edge_cases = vec![
-            (vec![42u8; 10], vec![]),                    // Empty value
-            (vec![43u8; 1], vec![1u8]),                  // Tiny value
-            (vec![45u8; 5], vec![2u8; 23]),              // Just under 24-byte threshold
-            (vec![46u8; 6], vec![3u8; 24]),              // Exactly at threshold
-            (vec![47u8; 7], vec![4u8; 25]),              // Just over threshold
-            (vec![48u8; 100], vec![5u8; 200]),           // Large key and value
+            (vec![42u8; 10], vec![]),          // Empty value
+            (vec![43u8; 1], vec![1u8]),        // Tiny value
+            (vec![45u8; 5], vec![2u8; 23]),    // Just under 24-byte threshold
+            (vec![46u8; 6], vec![3u8; 24]),    // Exactly at threshold
+            (vec![47u8; 7], vec![4u8; 25]),    // Just over threshold
+            (vec![48u8; 100], vec![5u8; 200]), // Large key and value
         ];
 
         for (key, value) in edge_cases {
             let test_data = vec![(key.clone(), value.clone())];
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
             let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &[&key]).unwrap();
 
             for node in &proof {
-                assert_eq!(node.len() % 8, 0, "Edge case node not 8-byte aligned: length {}", node.len());
+                assert_eq!(
+                    node.len() % 8,
+                    0,
+                    "Edge case node not 8-byte aligned: length {}",
+                    node.len()
+                );
             }
         }
 
@@ -1187,26 +1218,40 @@ mod tests {
                 test_data.push((key, value));
             }
 
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
 
             let non_existent_keys = vec![vec![250u8; 10], vec![251u8; 20]];
-            let proof = crate::generate_trie_proof::<L, _, _, _>(&db, root, &non_existent_keys).unwrap();
+            let proof =
+                crate::generate_trie_proof::<L, _, _, _>(&db, root, &non_existent_keys).unwrap();
 
             for node in &proof {
-                assert_eq!(node.len() % 8, 0, "Non-inclusion proof node not 8-byte aligned: length {}", node.len());
+                assert_eq!(
+                    node.len() % 8,
+                    0,
+                    "Non-inclusion proof node not 8-byte aligned: length {}",
+                    node.len()
+                );
             }
         }
 
         println!("✅ Storage proof 8-byte alignment verification PASSED!");
-        println!("   ✓ {} total proof nodes verified (all 8-byte aligned)", total_proof_nodes);
+        println!(
+            "   ✓ {} total proof nodes verified (all 8-byte aligned)",
+            total_proof_nodes
+        );
         println!("   ✓ Random data tests passed");
         println!("   ✓ Edge case tests passed");
         println!("   ✓ Non-inclusion proof tests passed");
     }
 
     fn child_reference_8_byte_boundary_inner<L: TrieConfiguration>() {
-        use rand::Rng;
         use crate::NodeCodec;
+        use rand::Rng;
         use trie_db::NodeCodec as NodeCodecT;
 
         let mut rng = rand::thread_rng();
@@ -1235,7 +1280,12 @@ mod tests {
         ];
 
         for test_data in test_cases {
-            let (db, root) = create_trie::<L>(&test_data.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect::<Vec<_>>());
+            let (db, root) = create_trie::<L>(
+                &test_data
+                    .iter()
+                    .map(|(k, v)| (k.as_slice(), v.as_slice()))
+                    .collect::<Vec<_>>(),
+            );
 
             // Generate storage proof to get encoded nodes
             let proof_keys: Vec<Vec<u8>> = test_data.iter().map(|(k, _)| k.clone()).collect();
@@ -1249,7 +1299,11 @@ mod tests {
                     match node_plan {
                         trie_db::node::NodePlan::NibbledBranch { children, .. } => {
                             // This is a branch node - check child reference positions
-                            check_branch_node_child_positions::<L>(node_data, &children, &mut child_refs_checked);
+                            check_branch_node_child_positions::<L>(
+                                node_data,
+                                &children,
+                                &mut child_refs_checked,
+                            );
                         }
                         _ => {} // Other node types don't have child references
                     }
@@ -1259,7 +1313,10 @@ mod tests {
 
         println!("✅ Child reference boundary verification PASSED!");
         println!("   ✓ {} nodes analyzed", nodes_checked);
-        println!("   ✓ {} child references verified at 8-byte boundaries", child_refs_checked);
+        println!(
+            "   ✓ {} child references verified at 8-byte boundaries",
+            child_refs_checked
+        );
     }
 
     fn check_branch_node_child_positions<L: TrieConfiguration>(
@@ -1267,7 +1324,6 @@ mod tests {
         children: &[Option<trie_db::node::NodeHandlePlan>; 16],
         child_refs_checked: &mut usize
     ) {
-        use trie_db::NodeCodec as NodeCodecT;
         use crate::NodeCodec;
 
         // Parse the node structure manually to verify positioning
@@ -1339,7 +1395,12 @@ mod tests {
 
     fn check_8_byte_alignment(data: &[u8], offset: usize, context: &str) {
         if data.len() % 8 != 0 {
-            println!("❌ {} at offset {} has length {} (not 8-byte aligned)", context, offset, data.len());
+            println!(
+                "❌ {} at offset {} has length {} (not 8-byte aligned)",
+                context,
+                offset,
+                data.len()
+            );
             println!("Data: {:?}", data);
             panic!("8-byte alignment violation in {}", context);
         }
