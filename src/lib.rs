@@ -48,10 +48,10 @@ use hash_db::{Hasher, Prefix};
 pub use memory_db::{prefixed_key, HashKey, KeyFunction, PrefixedKey};
 /// The Substrate format implementation of `NodeCodec`.
 pub use node_codec::NodeCodec;
-pub use storage_proof::{CompactProof, StorageProof, StorageProofError};
+pub use storage_proof::{CompactProof, FeltAlignedCompactProof, NodeBoundary, StorageProof, StorageProofError};
 /// Trie codec reexport, mainly child trie support
 /// for trie compact proof.
-pub use trie_codec::{decode_compact, encode_compact, Error as CompactProofError};
+pub use trie_codec::{decode_compact, encode_compact, encode_felt_aligned_compact, Error as CompactProofError};
 use trie_db::proof::{generate_proof, verify_proof};
 /// Various re-exports from the `trie-db` crate.
 pub use trie_db::{
