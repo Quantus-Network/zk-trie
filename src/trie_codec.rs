@@ -20,7 +20,7 @@
 //! This uses compact proof from trie crate and extends
 //! it to substrate specific layout and child trie system.
 
-use crate::{CompactProof, FeltAlignedCompactProof, HashDBT, TrieConfiguration, TrieHash, EMPTY_PREFIX};
+use crate::{CompactProof, HashDBT, TrieConfiguration, TrieHash, EMPTY_PREFIX};
 use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
 use hash_db::{HashDBRef, Hasher};
 use trie_db::{CError, NodeCodec, Trie};
@@ -212,69 +212,4 @@ where
     })
 }
 
-/// Encode a felt-aligned aware compact proof.
-///
-/// This function creates a compact proof that preserves felt-alignment boundaries
-/// by directly using the original storage proof structure without conversion.
-pub fn encode_felt_aligned_compact<L, DB>(
-    partial_db: &DB,
-    root: &TrieHash<L>,
-) -> Result<FeltAlignedCompactProof, Error<TrieHash<L>, CError<L>>>
-where
-    L: TrieConfiguration,
-    DB: HashDBT<L::Hash, trie_db::DBValue> + hash_db::HashDBRef<L::Hash, trie_db::DBValue>,
-{
-    // Extract all nodes directly from the database without compact proof conversion
-    // This preserves the original storage proof structure that works with felt-alignment
-    let mut proof_nodes = Vec::new();
-    
-    // Collect all nodes that are part of the proof by traversing from the root
-    let mut to_visit = vec![*root];
-    let mut visited = BTreeSet::new();
-    
-    while let Some(current_hash) = to_visit.pop() {
-        if visited.contains(&current_hash) {
-            continue;
-        }
-        visited.insert(current_hash);
-        
-        // Get the node data from the database
-        if let Some(node_data) = HashDBRef::get(partial_db, &current_hash, EMPTY_PREFIX) {
-            proof_nodes.push(node_data.to_vec());
-            
-            // Parse the node to find child references and add them to visit list
-            if let Ok(node_plan) = L::Codec::decode_plan(&node_data) {
-                match node_plan {
-                    trie_db::node::NodePlan::Empty => {},
-                    trie_db::node::NodePlan::Leaf { .. } => {},
-                    trie_db::node::NodePlan::Extension { child, .. } => {
-                        if let trie_db::node::NodeHandlePlan::Hash(range) = child {
-                            if range.end - range.start == <L::Hash as Hasher>::LENGTH {
-                                let hash_bytes = &node_data[range.clone()];
-                                let mut hash = TrieHash::<L>::default();
-                                hash.as_mut().copy_from_slice(hash_bytes);
-                                to_visit.push(hash);
-                            }
-                        }
-                    },
-                    trie_db::node::NodePlan::Branch { children, .. } |
-                    trie_db::node::NodePlan::NibbledBranch { children, .. } => {
-                        for child in children.iter().flatten() {
-                            if let trie_db::node::NodeHandlePlan::Hash(range) = child {
-                                if range.end - range.start == <L::Hash as Hasher>::LENGTH {
-                                    let hash_bytes = &node_data[range.clone()];
-                                    let mut hash = TrieHash::<L>::default();
-                                    hash.as_mut().copy_from_slice(hash_bytes);
-                                    to_visit.push(hash);
-                                }
-                            }
-                        }
-                    },
-                }
-            }
-        }
-    }
-    
-    // Create felt-aligned compact proof preserving original storage proof semantics
-    Ok(FeltAlignedCompactProof::new_from_storage_proof(proof_nodes))
-}
+

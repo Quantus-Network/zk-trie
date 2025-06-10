@@ -20,12 +20,10 @@ use codec::{Decode, Encode};
 use core::iter::{DoubleEndedIterator, IntoIterator};
 use hash_db::{HashDB, Hasher};
 use scale_info::TypeInfo;
-use trie_db::Trie;
 
 // Note that `LayoutV1` usage here (proof compaction) is compatible
 // with `LayoutV0`.
 use crate::LayoutV1 as Layout;
-use crate::encode_felt_aligned_compact;
 
 /// Error associated with the `storage_proof` module.
 #[derive(Encode, Decode, Clone, Eq, PartialEq, Debug, TypeInfo)]
@@ -162,23 +160,7 @@ impl StorageProof {
         compact_proof.ok().map(|p| p.encoded_size())
     }
 
-    /// Encode as a felt-aligned compact proof that properly handles boundary detection.
-    pub fn into_felt_aligned_compact_proof<H: Hasher>(
-        self,
-        root: H::Out,
-    ) -> Result<FeltAlignedCompactProof, crate::CompactProofError<H::Out, crate::Error<H::Out>>> {
-        let db = self.into_memory_db();
-        encode_felt_aligned_compact::<Layout<H>, crate::MemoryDB<H>>(&db, &root)
-    }
 
-    /// Encode as a felt-aligned compact proof that properly handles boundary detection.
-    pub fn to_felt_aligned_compact_proof<H: Hasher>(
-        &self,
-        root: H::Out,
-    ) -> Result<FeltAlignedCompactProof, crate::CompactProofError<H::Out, crate::Error<H::Out>>> {
-        let db = self.to_memory_db();
-        encode_felt_aligned_compact::<Layout<H>, crate::MemoryDB<H>>(&db, &root)
-    }
 }
 
 impl<H: Hasher> From<StorageProof> for crate::MemoryDB<H> {
@@ -203,25 +185,7 @@ pub struct CompactProof {
     pub encoded_nodes: Vec<Vec<u8>>,
 }
 
-/// Felt-aligned aware compact proof that properly handles boundary detection
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, TypeInfo)]
-pub struct FeltAlignedCompactProof {
-    /// Encoded nodes with explicit boundary markers
-    pub encoded_nodes: Vec<Vec<u8>>,
-    /// Metadata about node boundaries to prevent confusion
-    pub node_boundaries: Vec<NodeBoundary>,
-}
 
-/// Boundary information for felt-aligned nodes
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, TypeInfo)]
-pub struct NodeBoundary {
-    /// Start offset in the encoded data
-    pub start: u32,
-    /// Length of the actual node data (excluding padding)
-    pub length: u32,
-    /// Whether this contains value data that might look like headers
-    pub has_value_data: bool,
-}
 
 impl CompactProof {
     /// Return an iterator on the compact encoded nodes.
@@ -274,161 +238,7 @@ impl CompactProof {
     }
 }
 
-impl FeltAlignedCompactProof {
-    /// Create a new felt-aligned compact proof from node data
-    pub fn new(encoded_nodes: Vec<Vec<u8>>) -> Self {
-        let node_boundaries = encoded_nodes
-            .iter()
-            .enumerate()
-            .map(|(i, node)| {
-                // Analyze if this node contains value data that might look like headers
-                let has_value_data = Self::node_contains_problematic_value_data(node);
-                NodeBoundary {
-                    start: i as u32,
-                    length: node.len() as u32,
-                    has_value_data,
-                }
-            })
-            .collect();
 
-        Self {
-            encoded_nodes,
-            node_boundaries,
-        }
-    }
-
-    /// Create a new felt-aligned compact proof from storage proof format
-    pub fn new_from_storage_proof(proof_nodes: Vec<Vec<u8>>) -> Self {
-        // Simple wrapper that preserves storage proof semantics
-        let node_boundaries = proof_nodes
-            .iter()
-            .enumerate()
-            .map(|(i, node)| NodeBoundary {
-                start: i as u32,
-                length: node.len() as u32,
-                has_value_data: false, // Storage proof format is safe
-            })
-            .collect();
-
-        Self {
-            encoded_nodes: proof_nodes,
-            node_boundaries,
-        }
-    }
-
-    /// Check if a node contains value data that might be confused with headers
-    fn node_contains_problematic_value_data(node_data: &[u8]) -> bool {
-        if node_data.len() < 16 {
-            return false;
-        }
-
-        // Only flag nodes that contain repeating value patterns that are likely
-        // to be the problematic cases we identified earlier
-        let mut consecutive_same_bytes = 0;
-        let mut last_byte = node_data[0];
-        
-        for &byte in &node_data[1..] {
-            if byte == last_byte {
-                consecutive_same_bytes += 1;
-                // If we have 16+ consecutive identical bytes, this might be 
-                // the repeating value data we saw in the debug output
-                if consecutive_same_bytes >= 15 {
-                    return true;
-                }
-            } else {
-                consecutive_same_bytes = 0;
-                last_byte = byte;
-            }
-        }
-        
-        false
-    }
-
-    /// Return an iterator on the encoded nodes with boundary awareness
-    pub fn iter_nodes_with_boundaries(&self) -> impl Iterator<Item = (&[u8], &NodeBoundary)> {
-        self.encoded_nodes
-            .iter()
-            .zip(self.node_boundaries.iter())
-            .map(|(node, boundary)| (node.as_slice(), boundary))
-    }
-
-    /// Get the total encoded size
-    pub fn encoded_size(&self) -> usize {
-        self.encoded_nodes.iter().map(|n| n.len()).sum::<usize>() +
-            self.node_boundaries.len() * core::mem::size_of::<NodeBoundary>()
-    }
-
-    /// Convert to standard CompactProof format (unsafe - may cause boundary issues)
-    pub fn to_compact_proof(&self) -> CompactProof {
-        CompactProof {
-            encoded_nodes: self.encoded_nodes.clone(),
-        }
-    }
-
-    /// Decode to a full storage proof using felt-aligned aware decoding
-    pub fn to_storage_proof<H: Hasher>(
-        &self,
-        expected_root: Option<&H::Out>,
-    ) -> Result<(StorageProof, H::Out), crate::CompactProofError<H::Out, crate::Error<H::Out>>>
-    {
-        // Simple approach: if we created this from storage proof format,
-        // we can safely reconstruct the storage proof directly
-        if self.node_boundaries.iter().all(|b| !b.has_value_data) {
-            // This was created from safe storage proof format
-            let storage_proof = StorageProof::new(self.encoded_nodes.clone());
-            
-            // Validate the root by creating a memory DB and checking
-            let db = storage_proof.to_memory_db::<H>();
-            if let Some(expected_root) = expected_root {
-                let trie = crate::TrieDBBuilder::<Layout<H>>::new(&db, expected_root).build();
-                let root = *trie.root();
-                return Ok((storage_proof, root));
-            } else {
-                // Without expected root, we can't validate easily, but return the storage proof
-                return Err(crate::trie_codec::Error::IncompleteProof.into());
-            }
-        }
-        
-        // Fallback to boundary-aware decoding for complex cases
-        let mut db = crate::MemoryDB::<H>::new(&[]);
-        let root = self.decode_with_boundary_awareness::<H>(&mut db, expected_root)?;
-
-        Ok((
-            StorageProof::new(db.drain().into_iter().filter_map(|kv| {
-                if (kv.1).1 > 0 {
-                    Some((kv.1).0)
-                } else {
-                    None
-                }
-            })),
-            root,
-        ))
-    }
-
-    /// Custom decoder that respects felt-alignment boundaries
-    fn decode_with_boundary_awareness<H: Hasher>(
-        &self,
-        db: &mut crate::MemoryDB<H>,
-        expected_root: Option<&H::Out>,
-    ) -> Result<H::Out, crate::CompactProofError<H::Out, crate::Error<H::Out>>> {
-        // Simplified approach: insert all nodes directly into DB and validate
-        for node in &self.encoded_nodes {
-            db.insert(crate::EMPTY_PREFIX, node);
-        }
-        
-        // Validate the expected root exists
-        if let Some(expected_root) = expected_root {
-            if !db.contains(expected_root, crate::EMPTY_PREFIX) {
-                return Err(crate::trie_codec::Error::IncompleteProof.into());
-            }
-            Ok(*expected_root)
-        } else {
-            // If no expected root provided, return the first hash we can find
-            // This is a fallback case
-            Err(crate::trie_codec::Error::IncompleteProof.into())
-        }
-    }
-}
 
 #[cfg(test)]
 pub mod tests {
