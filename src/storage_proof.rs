@@ -159,8 +159,6 @@ impl StorageProof {
         let compact_proof = self.into_compact_proof::<H>(root);
         compact_proof.ok().map(|p| p.encoded_size())
     }
-
-
 }
 
 impl<H: Hasher> From<StorageProof> for crate::MemoryDB<H> {
@@ -184,8 +182,6 @@ impl<H: Hasher> From<&StorageProof> for crate::MemoryDB<H> {
 pub struct CompactProof {
     pub encoded_nodes: Vec<Vec<u8>>,
 }
-
-
 
 impl CompactProof {
     /// Return an iterator on the compact encoded nodes.
@@ -238,13 +234,12 @@ impl CompactProof {
     }
 }
 
-
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
     use crate::{tests::create_storage_proof, StorageProof};
 
+    type Hasher = sp_core::Blake2Hasher;
     type Layout = crate::LayoutV1<sp_core::Blake2Hasher>;
 
     const TEST_DATA: &[(&[u8], &[u8])] = &[
@@ -261,5 +256,14 @@ pub mod tests {
             StorageProof::new_with_duplicate_nodes_check(raw_proof),
             Err(StorageProofError::DuplicateNodes)
         ));
+    }
+
+    #[test]
+    fn invalid_compact_proof_does_not_panic_when_decoding() {
+        let invalid_proof = CompactProof {
+            encoded_nodes: vec![vec![135]],
+        };
+        let result = invalid_proof.to_memory_db::<Hasher>(None);
+        assert!(result.is_err());
     }
 }
