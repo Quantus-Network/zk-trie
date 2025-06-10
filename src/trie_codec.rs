@@ -21,8 +21,9 @@
 //! it to substrate specific layout and child trie system.
 
 use crate::{CompactProof, FeltAlignedCompactProof, HashDBT, TrieConfiguration, TrieHash, EMPTY_PREFIX};
-use alloc::{boxed::Box, vec::Vec};
-use trie_db::{CError, Trie};
+use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
+use hash_db::{HashDBRef, Hasher};
+use trie_db::{CError, NodeCodec, Trie};
 
 /// Error for trie node decoding.
 #[derive(Debug)]
@@ -214,7 +215,7 @@ where
 /// Encode a felt-aligned aware compact proof.
 ///
 /// This function creates a compact proof that preserves felt-alignment boundaries
-/// by using a simple compression of the StorageProof format.
+/// by directly using the original storage proof structure without conversion.
 pub fn encode_felt_aligned_compact<L, DB>(
     partial_db: &DB,
     root: &TrieHash<L>,
@@ -223,24 +224,57 @@ where
     L: TrieConfiguration,
     DB: HashDBT<L::Hash, trie_db::DBValue> + hash_db::HashDBRef<L::Hash, trie_db::DBValue>,
 {
-    // Simple approach: Use the existing storage proof format which works correctly
-    // with felt-alignment, but compress it for better efficiency
-    
-    // Extract all nodes from the database that have been accessed for the proof
+    // Extract all nodes directly from the database without compact proof conversion
+    // This preserves the original storage proof structure that works with felt-alignment
     let mut proof_nodes = Vec::new();
     
-    // Create a new memory DB and copy over the proof nodes
-    let _temp_db = crate::MemoryDB::<L::Hash>::new(&[]);
+    // Collect all nodes that are part of the proof by traversing from the root
+    let mut to_visit = vec![*root];
+    let mut visited = BTreeSet::new();
     
-    // We need a different approach since we can't convert from arbitrary DB types
-    // For now, we'll use the standard encode_compact and then wrap it in our format
-    let standard_compact = encode_compact::<L, DB>(partial_db, root)?;
-    
-    // Extract the nodes from the standard compact proof but mark them appropriately
-    for node in standard_compact.encoded_nodes {
-        proof_nodes.push(node);
+    while let Some(current_hash) = to_visit.pop() {
+        if visited.contains(&current_hash) {
+            continue;
+        }
+        visited.insert(current_hash);
+        
+        // Get the node data from the database
+        if let Some(node_data) = HashDBRef::get(partial_db, &current_hash, EMPTY_PREFIX) {
+            proof_nodes.push(node_data.to_vec());
+            
+            // Parse the node to find child references and add them to visit list
+            if let Ok(node_plan) = L::Codec::decode_plan(&node_data) {
+                match node_plan {
+                    trie_db::node::NodePlan::Empty => {},
+                    trie_db::node::NodePlan::Leaf { .. } => {},
+                    trie_db::node::NodePlan::Extension { child, .. } => {
+                        if let trie_db::node::NodeHandlePlan::Hash(range) = child {
+                            if range.end - range.start == <L::Hash as Hasher>::LENGTH {
+                                let hash_bytes = &node_data[range.clone()];
+                                let mut hash = TrieHash::<L>::default();
+                                hash.as_mut().copy_from_slice(hash_bytes);
+                                to_visit.push(hash);
+                            }
+                        }
+                    },
+                    trie_db::node::NodePlan::Branch { children, .. } |
+                    trie_db::node::NodePlan::NibbledBranch { children, .. } => {
+                        for child in children.iter().flatten() {
+                            if let trie_db::node::NodeHandlePlan::Hash(range) = child {
+                                if range.end - range.start == <L::Hash as Hasher>::LENGTH {
+                                    let hash_bytes = &node_data[range.clone()];
+                                    let mut hash = TrieHash::<L>::default();
+                                    hash.as_mut().copy_from_slice(hash_bytes);
+                                    to_visit.push(hash);
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        }
     }
     
-    // Create felt-aligned compact proof preserving storage proof semantics
+    // Create felt-aligned compact proof preserving original storage proof semantics
     Ok(FeltAlignedCompactProof::new_from_storage_proof(proof_nodes))
 }
