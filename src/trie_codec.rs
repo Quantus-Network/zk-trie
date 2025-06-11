@@ -161,7 +161,8 @@ where
     DB: HashDBT<L::Hash, trie_db::DBValue> + hash_db::HashDBRef<L::Hash, trie_db::DBValue>,
 {
     let mut child_tries = Vec::new();
-    let mut compact_proof = {
+    let mut all_nodes = Vec::new();
+    {
         let trie = crate::TrieDBBuilder::<L>::new(partial_db, root).build();
 
         let mut iter = trie.iter()?;
@@ -190,7 +191,11 @@ where
             }
         }
 
-        trie_db::encode_compact::<L>(&trie)?
+        // Instead of trie_db::encode_compact, collect all nodes from the database
+        // The database contains exactly the nodes we need for the StorageProof
+        if let Some(root_node) = hash_db::HashDB::get(partial_db, root, EMPTY_PREFIX) {
+            all_nodes.push(root_node);
+        }
     };
 
     for child_root in child_tries {
@@ -200,13 +205,15 @@ where
             continue;
         }
 
-        let trie = crate::TrieDBBuilder::<L>::new(partial_db, &child_root).build();
-        let child_proof = trie_db::encode_compact::<L>(&trie)?;
-
-        compact_proof.extend(child_proof);
+        // Instead of trie_db::encode_compact, collect child nodes directly
+        if let Some(child_node) = hash_db::HashDB::get(partial_db, &child_root, EMPTY_PREFIX) {
+            all_nodes.push(child_node);
+        }
     }
 
+    // Create a StorageProof from all collected nodes and wrap it in CompactProof
+    let storage_proof = crate::StorageProof::new(all_nodes);
     Ok(CompactProof {
-        encoded_nodes: compact_proof,
+        encoded_nodes: storage_proof.into_iter_nodes().collect(),
     })
 }
