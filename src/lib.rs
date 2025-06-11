@@ -206,196 +206,194 @@ impl<H: Hasher, T: hash_db::AsHashDB<H, trie_db::DBValue>> AsHashDB<H> for T {}
 /// Reexport from `hash_db`, with genericity set for `Hasher` trait.
 pub type HashDB<'a, H> = dyn hash_db::HashDB<H, trie_db::DBValue> + 'a;
 /// ZK-trie compatible prefixed memory database with correct default initialization
-pub struct PrefixedMemoryDB<H: Hasher>(memory_db::MemoryDB<H, memory_db::PrefixedKey<H>, trie_db::DBValue>);
+pub struct PrefixedMemoryDB<H: Hasher>(
+    memory_db::MemoryDB<H, memory_db::PrefixedKey<H>, trie_db::DBValue>,
+);
 
 impl<H: Hasher> PrefixedMemoryDB<H> {
-	pub fn new(prefix: &[u8]) -> Self {
-		Self(memory_db::MemoryDB::new(prefix))
-	}
+    pub fn new(prefix: &[u8]) -> Self {
+        Self(memory_db::MemoryDB::new(prefix))
+    }
 
-	pub fn default_with_root() -> (Self, H::Out) {
-		let (inner_db, root) = memory_db::MemoryDB::default_with_root();
-		(Self(inner_db), root)
-	}
+    pub fn default_with_root() -> (Self, H::Out) {
+        let (inner_db, root) = memory_db::MemoryDB::default_with_root();
+        (Self(inner_db), root)
+    }
 
-	pub fn consolidate(&mut self, other: Self) {
-		self.0.consolidate(other.0)
-	}
+    pub fn consolidate(&mut self, other: Self) {
+        self.0.consolidate(other.0)
+    }
 }
 
 impl<H: Hasher> Clone for PrefixedMemoryDB<H> {
-	fn clone(&self) -> Self {
-		Self(self.0.clone())
-	}
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl<H: Hasher> Default for PrefixedMemoryDB<H> {
-	fn default() -> Self {
-		Self::new(&0u64.to_le_bytes())
-	}
+    fn default() -> Self {
+        Self::new(&0u64.to_le_bytes())
+    }
 }
 
 impl<H: Hasher> core::ops::Deref for PrefixedMemoryDB<H> {
-	type Target = memory_db::MemoryDB<H, memory_db::PrefixedKey<H>, trie_db::DBValue>;
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
+    type Target = memory_db::MemoryDB<H, memory_db::PrefixedKey<H>, trie_db::DBValue>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl<H: Hasher> core::ops::DerefMut for PrefixedMemoryDB<H> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
-	}
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl<H: Hasher> hash_db::AsHashDB<H, trie_db::DBValue> for PrefixedMemoryDB<H> {
-	fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
-		&self.0
-	}
+    fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
+        &self.0
+    }
 
-	fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
-		&mut self.0
-	}
+    fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
+        &mut self.0
+    }
 }
 
 impl<H: Hasher> hash_db::AsHashDB<H, trie_db::DBValue> for &PrefixedMemoryDB<H> {
-	fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
-		&self.0
-	}
+    fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
+        &self.0
+    }
 
-	fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
-		unreachable!("Cannot get mutable reference from shared reference")
-	}
+    fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
+        unreachable!("Cannot get mutable reference from shared reference")
+    }
 }
 
 impl<H: Hasher> hash_db::HashDB<H, trie_db::DBValue> for PrefixedMemoryDB<H> {
-	fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
-		hash_db::HashDB::get(&self.0, key, prefix)
-	}
+    fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
+        hash_db::HashDB::get(&self.0, key, prefix)
+    }
 
-	fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
-		hash_db::HashDB::contains(&self.0, key, prefix)
-	}
+    fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
+        hash_db::HashDB::contains(&self.0, key, prefix)
+    }
 
-	fn insert(&mut self, prefix: hash_db::Prefix, value: &[u8]) -> H::Out {
-		hash_db::HashDB::insert(&mut self.0, prefix, value)
-	}
+    fn insert(&mut self, prefix: hash_db::Prefix, value: &[u8]) -> H::Out {
+        hash_db::HashDB::insert(&mut self.0, prefix, value)
+    }
 
-	fn emplace(&mut self, key: H::Out, prefix: hash_db::Prefix, value: trie_db::DBValue) {
-		hash_db::HashDB::emplace(&mut self.0, key, prefix, value)
-	}
+    fn emplace(&mut self, key: H::Out, prefix: hash_db::Prefix, value: trie_db::DBValue) {
+        hash_db::HashDB::emplace(&mut self.0, key, prefix, value)
+    }
 
-	fn remove(&mut self, key: &H::Out, prefix: hash_db::Prefix) {
-		hash_db::HashDB::remove(&mut self.0, key, prefix)
-	}
+    fn remove(&mut self, key: &H::Out, prefix: hash_db::Prefix) {
+        hash_db::HashDB::remove(&mut self.0, key, prefix)
+    }
 }
 
 impl<H: Hasher> hash_db::HashDBRef<H, trie_db::DBValue> for PrefixedMemoryDB<H> {
-	fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
-		hash_db::HashDBRef::get(&self.0, key, prefix)
-	}
+    fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
+        hash_db::HashDBRef::get(&self.0, key, prefix)
+    }
 
-	fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
-		hash_db::HashDBRef::contains(&self.0, key, prefix)
-	}
+    fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
+        hash_db::HashDBRef::contains(&self.0, key, prefix)
+    }
 }
-
 
 /// ZK-trie compatible memory database with correct default initialization
 pub struct MemoryDB<H: Hasher>(memory_db::MemoryDB<H, memory_db::HashKey<H>, trie_db::DBValue>);
 
 impl<H: Hasher> MemoryDB<H> {
-	pub fn new(prefix: &[u8]) -> Self {
-		Self(memory_db::MemoryDB::new(prefix))
-	}
+    pub fn new(prefix: &[u8]) -> Self {
+        Self(memory_db::MemoryDB::new(prefix))
+    }
 
-	pub fn consolidate(&mut self, other: Self) {
-		self.0.consolidate(other.0)
-	}
+    pub fn consolidate(&mut self, other: Self) {
+        self.0.consolidate(other.0)
+    }
 }
 
 impl<H: Hasher> Clone for MemoryDB<H> {
-	fn clone(&self) -> Self {
-		Self(self.0.clone())
-	}
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl<H: Hasher> Default for MemoryDB<H> {
-	fn default() -> Self {
-		Self::new(&0u64.to_le_bytes())
-	}
+    fn default() -> Self {
+        Self::new(&0u64.to_le_bytes())
+    }
 }
 
 impl<H: Hasher> core::ops::Deref for MemoryDB<H> {
-	type Target = memory_db::MemoryDB<H, memory_db::HashKey<H>, trie_db::DBValue>;
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
+    type Target = memory_db::MemoryDB<H, memory_db::HashKey<H>, trie_db::DBValue>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl<H: Hasher> core::ops::DerefMut for MemoryDB<H> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
-	}
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl<H: Hasher> hash_db::AsHashDB<H, trie_db::DBValue> for MemoryDB<H> {
-	fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
-		&self.0
-	}
+    fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
+        &self.0
+    }
 
-	fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
-		&mut self.0
-	}
+    fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
+        &mut self.0
+    }
 }
 
 impl<H: Hasher> hash_db::AsHashDB<H, trie_db::DBValue> for &MemoryDB<H> {
-	fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
-		&self.0
-	}
+    fn as_hash_db(&self) -> &dyn hash_db::HashDB<H, trie_db::DBValue> {
+        &self.0
+    }
 
-	fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
-		unreachable!("Cannot get mutable reference from shared reference")
-	}
+    fn as_hash_db_mut<'a>(&'a mut self) -> &'a mut (dyn hash_db::HashDB<H, trie_db::DBValue> + 'a) {
+        unreachable!("Cannot get mutable reference from shared reference")
+    }
 }
 
 impl<H: Hasher> hash_db::HashDB<H, trie_db::DBValue> for MemoryDB<H> {
-	fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
-		hash_db::HashDB::get(&self.0, key, prefix)
-	}
+    fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
+        hash_db::HashDB::get(&self.0, key, prefix)
+    }
 
-	fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
-		hash_db::HashDB::contains(&self.0, key, prefix)
-	}
+    fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
+        hash_db::HashDB::contains(&self.0, key, prefix)
+    }
 
-	fn insert(&mut self, prefix: hash_db::Prefix, value: &[u8]) -> H::Out {
-		hash_db::HashDB::insert(&mut self.0, prefix, value)
-	}
+    fn insert(&mut self, prefix: hash_db::Prefix, value: &[u8]) -> H::Out {
+        hash_db::HashDB::insert(&mut self.0, prefix, value)
+    }
 
-	fn emplace(&mut self, key: H::Out, prefix: hash_db::Prefix, value: trie_db::DBValue) {
-		hash_db::HashDB::emplace(&mut self.0, key, prefix, value)
-	}
+    fn emplace(&mut self, key: H::Out, prefix: hash_db::Prefix, value: trie_db::DBValue) {
+        hash_db::HashDB::emplace(&mut self.0, key, prefix, value)
+    }
 
-	fn remove(&mut self, key: &H::Out, prefix: hash_db::Prefix) {
-		hash_db::HashDB::remove(&mut self.0, key, prefix)
-	}
+    fn remove(&mut self, key: &H::Out, prefix: hash_db::Prefix) {
+        hash_db::HashDB::remove(&mut self.0, key, prefix)
+    }
 }
 
 impl<H: Hasher> hash_db::HashDBRef<H, trie_db::DBValue> for MemoryDB<H> {
-	fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
-		hash_db::HashDBRef::get(&self.0, key, prefix)
-	}
+    fn get(&self, key: &H::Out, prefix: hash_db::Prefix) -> Option<trie_db::DBValue> {
+        hash_db::HashDBRef::get(&self.0, key, prefix)
+    }
 
-	fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
-		hash_db::HashDBRef::contains(&self.0, key, prefix)
-	}
+    fn contains(&self, key: &H::Out, prefix: hash_db::Prefix) -> bool {
+        hash_db::HashDBRef::contains(&self.0, key, prefix)
+    }
 }
-
 
 /// Reexport from `hash_db`, with genericity set for `Hasher` trait.
 pub type GenericMemoryDB<H, KF> = memory_db::MemoryDB<H, KF, trie_db::DBValue>;
-
-
 
 /// Persistent trie database read-access interface for a given hasher.
 pub type TrieDB<'a, 'cache, L> = trie_db::TrieDB<'a, 'cache, L>;
@@ -1322,7 +1320,7 @@ mod tests {
     fn check_branch_node_child_positions<L: TrieConfiguration>(
         node_data: &[u8],
         children: &[Option<trie_db::node::NodeHandlePlan>; 16],
-        child_refs_checked: &mut usize
+        child_refs_checked: &mut usize,
     ) {
         use crate::NodeCodec;
 
@@ -1885,7 +1883,7 @@ mod tests {
     }
 
     fn test_reproduce_incomplete_database_scenarios_inner<L: TrieConfiguration>() {
-        use memory_db::{MemoryDB, HashKey};
+        use memory_db::{HashKey, MemoryDB};
         use trie_db::{TrieDBMutBuilder, TrieMut};
 
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
@@ -1896,16 +1894,23 @@ mod tests {
             let mut trie = TrieDBMutBuilder::<L>::new(&mut memdb, &mut root).build();
 
             // These are the exact insertions that were failing in the balance tests
-            trie.insert(b"value3", &[142; 33]).expect("insert failed - 33 byte array");
-            trie.insert(b"value4", &[124; 33]).expect("insert failed - 33 byte array");
-            trie.insert(b"key", b"value").expect("insert failed - string value");
-            trie.insert(b"value1", &[42]).expect("insert failed - 1 byte");
-            trie.insert(b"value2", &[24]).expect("insert failed - 1 byte");
-            trie.insert(b":code", b"return 42").expect("insert failed - code string");
+            trie.insert(b"value3", &[142; 33])
+                .expect("insert failed - 33 byte array");
+            trie.insert(b"value4", &[124; 33])
+                .expect("insert failed - 33 byte array");
+            trie.insert(b"key", b"value")
+                .expect("insert failed - string value");
+            trie.insert(b"value1", &[42])
+                .expect("insert failed - 1 byte");
+            trie.insert(b"value2", &[24])
+                .expect("insert failed - 1 byte");
+            trie.insert(b":code", b"return 42")
+                .expect("insert failed - code string");
 
             // Insert range like in the failing tests
             for i in 128u8..255u8 {
-                trie.insert(&[i], &[i]).expect(&format!("insert failed for {}", i));
+                trie.insert(&[i], &[i])
+                    .expect(&format!("insert failed for {}", i));
             }
         }
 
@@ -1927,18 +1932,23 @@ mod tests {
     }
 
     fn test_child_trie_root_handling_inner<L: TrieConfiguration>() {
-        use memory_db::{MemoryDB, HashKey, PrefixedKey};
-        use trie_db::{TrieDBMutBuilder, TrieMut};
         use codec::Encode;
+        use memory_db::{HashKey, MemoryDB, PrefixedKey};
+        use trie_db::{TrieDBMutBuilder, TrieMut};
 
         // Step 1: Build a child trie (mimicking the test_db pattern)
         let mut child_memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
         let mut child_root = Default::default();
 
         {
-            let mut child_trie = TrieDBMutBuilder::<L>::new(&mut child_memdb, &mut child_root).build();
-            child_trie.insert(b"value3", &[142; 33]).expect("child insert failed");
-            child_trie.insert(b"value4", &[124; 33]).expect("child insert failed");
+            let mut child_trie =
+                TrieDBMutBuilder::<L>::new(&mut child_memdb, &mut child_root).build();
+            child_trie
+                .insert(b"value3", &[142; 33])
+                .expect("child insert failed");
+            child_trie
+                .insert(b"value4", &[124; 33])
+                .expect("child insert failed");
         }
 
         // Step 2: Encode the child root like in the failing test
@@ -1953,16 +1963,22 @@ mod tests {
 
             // This pattern was causing IncompleteDatabase errors
             let child_storage_key = b":child_storage_default:child";
-            main_trie.insert(child_storage_key, &sub_root).expect("main trie insert of child root failed");
+            main_trie
+                .insert(child_storage_key, &sub_root)
+                .expect("main trie insert of child root failed");
 
             // Add other data like in the failing test
             main_trie.insert(b"key", b"value").expect("insert failed");
             main_trie.insert(b"value1", &[42]).expect("insert failed");
             main_trie.insert(b"value2", &[24]).expect("insert failed");
-            main_trie.insert(b":code", b"return 42").expect("insert failed");
+            main_trie
+                .insert(b":code", b"return 42")
+                .expect("insert failed");
 
             for i in 128u8..255u8 {
-                main_trie.insert(&[i], &[i]).expect(&format!("insert failed for {}", i));
+                main_trie
+                    .insert(&[i], &[i])
+                    .expect(&format!("insert failed for {}", i));
             }
         }
 
@@ -1979,7 +1995,7 @@ mod tests {
     }
 
     fn test_unaligned_value_insertion_edge_cases_inner<L: TrieConfiguration>() {
-        use memory_db::{MemoryDB, HashKey};
+        use memory_db::{HashKey, MemoryDB};
         use trie_db::{TrieDBMutBuilder, TrieMut};
 
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
@@ -2002,11 +2018,13 @@ mod tests {
             ];
 
             for (key, value) in &test_cases {
-                trie.insert(key, value).expect(&format!("Failed to insert {} bytes", value.len()));
+                trie.insert(key, value)
+                    .expect(&format!("Failed to insert {} bytes", value.len()));
             }
 
             // Also test the exact pattern from the failing balance tests
-            trie.insert(b"balance_key", &[142; 33]).expect("balance-like insert failed");
+            trie.insert(b"balance_key", &[142; 33])
+                .expect("balance-like insert failed");
         }
 
         // Verify round-trip consistency
@@ -2026,8 +2044,12 @@ mod tests {
 
         for (key, expected_value) in &test_cases {
             let stored_value = trie.get(key).unwrap();
-            assert_eq!(stored_value, Some(expected_value.clone()),
-                      "Round-trip failed for {} byte value", expected_value.len());
+            assert_eq!(
+                stored_value,
+                Some(expected_value.clone()),
+                "Round-trip failed for {} byte value",
+                expected_value.len()
+            );
         }
 
         assert_eq!(trie.get(b"balance_key").unwrap(), Some(vec![142; 33]));
@@ -2041,37 +2063,42 @@ mod tests {
 
     fn test_encode_decode_round_trip_consistency_inner<L: TrieConfiguration>() {
         use crate::NodeCodec;
+        use trie_db::node::{NodePlan, Value};
         use trie_db::NodeCodec as NodeCodecT;
-        use trie_db::node::{Value, NodePlan};
 
         // Test round-trip for various problematic value sizes
         let test_values = vec![
-            vec![],           // 0 bytes
-            vec![42],         // 1 byte
-            vec![1, 2, 3],    // 3 bytes
-            vec![1; 5],       // 5 bytes
-            vec![1; 7],       // 7 bytes
-            vec![1; 9],       // 9 bytes
-            vec![142; 33],    // 33 bytes (from failing test)
-            vec![1; 65],      // 65 bytes
+            vec![],        // 0 bytes
+            vec![42],      // 1 byte
+            vec![1, 2, 3], // 3 bytes
+            vec![1; 5],    // 5 bytes
+            vec![1; 7],    // 7 bytes
+            vec![1; 9],    // 9 bytes
+            vec![142; 33], // 33 bytes (from failing test)
+            vec![1; 65],   // 65 bytes
         ];
 
         for value in test_values {
             // Test leaf node encoding/decoding
-            let encoded = NodeCodec::<L::Hash>::leaf_node(
-                [0xaa].iter().copied(),
-                2,
-                Value::Inline(&value)
-            );
+            let encoded =
+                NodeCodec::<L::Hash>::leaf_node([0xaa].iter().copied(), 2, Value::Inline(&value));
 
             let decoded = NodeCodec::<L::Hash>::decode_plan(&encoded)
                 .expect(&format!("Failed to decode {} byte value", value.len()));
 
-            if let NodePlan::Leaf { value: decoded_value, .. } = decoded {
+            if let NodePlan::Leaf {
+                value: decoded_value,
+                ..
+            } = decoded
+            {
                 if let trie_db::node::ValuePlan::Inline(range) = decoded_value {
                     let decoded_bytes = &encoded[range];
-                    assert_eq!(decoded_bytes, &value[..],
-                              "Round-trip mismatch for {} byte value", value.len());
+                    assert_eq!(
+                        decoded_bytes,
+                        &value[..],
+                        "Round-trip mismatch for {} byte value",
+                        value.len()
+                    );
                 } else {
                     panic!("Expected inline value for {} bytes", value.len());
                 }
@@ -2088,7 +2115,7 @@ mod tests {
     }
 
     fn test_minimal_single_insert_inner<L: TrieConfiguration>() {
-        use memory_db::{MemoryDB, HashKey};
+        use memory_db::{HashKey, MemoryDB};
         use trie_db::{TrieDBMutBuilder, TrieMut};
 
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());
@@ -2100,7 +2127,8 @@ mod tests {
 
             // Start with the exact failing case
             println!("Attempting to insert single problematic value...");
-            trie.insert(b"value3", &[142; 33]).expect("MINIMAL SINGLE INSERT FAILED");
+            trie.insert(b"value3", &[142; 33])
+                .expect("MINIMAL SINGLE INSERT FAILED");
             println!("✓ Single insert succeeded");
         }
 
@@ -2118,7 +2146,7 @@ mod tests {
     }
 
     fn test_progressive_inserts_inner<L: TrieConfiguration>() {
-        use memory_db::{MemoryDB, HashKey};
+        use memory_db::{HashKey, MemoryDB};
         use trie_db::{TrieDBMutBuilder, TrieMut};
 
         let mut memdb = MemoryDBMeta::<L::Hash>::new(&0u64.to_le_bytes());

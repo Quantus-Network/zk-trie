@@ -164,7 +164,7 @@ where
                         let mut length_array = [0u8; 8];
                         length_array.copy_from_slice(length_bytes);
                         let count = u64::from_le_bytes(length_array) as usize;
-                        
+
                         let range = input.take(count)?;
                         children[i] = Some(if count == H::LENGTH {
                             NodeHandlePlan::Hash(range)
