@@ -180,17 +180,29 @@ where
                 })
             }
             NodeHeader::HashedValueLeaf(nibble_count) | NodeHeader::Leaf(nibble_count) => {
-                let padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
-                // check that the padding is valid (if any)
-                if padding && nibble_ops::pad_left(data[input.offset]) != 0 {
-                    return Err(Error::BadFormat);
-                }
                 let nibble_bytes = (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1))
                     / nibble_ops::NIBBLE_PER_BYTE;
-                let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
-                let felt_aligned_range = input.take(felt_aligned_bytes)?;
-                // Only pass the actual nibble data to NibbleSlicePlan, not the padding
-                let partial = felt_aligned_range.start..(felt_aligned_range.start + nibble_bytes);
+
+                // Calculate prefix padding to ensure partial key data aligns to felt boundaries
+                let misalignment = nibble_bytes % 8;
+                let prefix_padding = if misalignment == 0 {
+                    0
+                } else {
+                    8 - misalignment
+                };
+                let total_nibble_section = ((prefix_padding + nibble_bytes + 7) / 8) * 8;
+
+                let felt_aligned_range = input.take(total_nibble_section)?;
+
+                // Skip prefix padding and locate actual nibble data
+                let nibble_start = felt_aligned_range.start + prefix_padding;
+                let nibble_padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
+                // check that the padding is valid (if any)
+                if nibble_padding && nibble_ops::pad_left(data[nibble_start]) != 0 {
+                    return Err(Error::BadFormat);
+                }
+
+                let partial = nibble_start..(nibble_start + nibble_bytes);
                 let partial_padding = nibble_ops::number_padding(nibble_count);
                 let value = if contains_hash {
                     ValuePlan::Node(input.take(H::LENGTH)?)
@@ -353,8 +365,29 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
 ) -> Vec<u8> {
     let nibble_bytes =
         (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) / nibble_ops::NIBBLE_PER_BYTE;
-    let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
-    let mut output = Vec::with_capacity(8 + felt_aligned_bytes);
+
+    // For leaf nodes, ensure partial key data aligns to felt boundaries
+    let (prefix_padding, total_nibble_section) = match node_kind {
+        NodeKind::Leaf | NodeKind::HashedValueLeaf => {
+            // Calculate prefix padding to ensure proper felt boundary alignment
+            // for ZK proof verification - align partial data to end at felt boundary
+            let misalignment = nibble_bytes % 8;
+            let prefix_pad = if misalignment == 0 {
+                0
+            } else {
+                8 - misalignment
+            };
+            let total_section = ((prefix_pad + nibble_bytes + 7) / 8) * 8;
+            (prefix_pad, total_section)
+        }
+        _ => {
+            // Branch nodes use standard padding
+            let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+            (0, felt_aligned_bytes)
+        }
+    };
+
+    let mut output = Vec::with_capacity(8 + total_nibble_section);
     match node_kind {
         NodeKind::Leaf => NodeHeader::Leaf(nibble_count).encode_to(&mut output),
         NodeKind::BranchWithValue => NodeHeader::Branch(true, nibble_count).encode_to(&mut output),
@@ -367,12 +400,17 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
         }
     };
 
-    // Collect partial bytes and pad to felt-aligned length
+    // Add prefix padding for leaf nodes
+    for _ in 0..prefix_padding {
+        output.push(0);
+    }
+
+    // Collect partial bytes and add them
     let partial_bytes: Vec<u8> = partial.collect();
     output.extend_from_slice(&partial_bytes);
 
-    // Pad with zeros to reach felt-aligned length
-    while output.len() - 8 < felt_aligned_bytes {
+    // Pad with zeros to reach total section size
+    while output.len() - 8 < total_nibble_section {
         output.push(0);
     }
 
