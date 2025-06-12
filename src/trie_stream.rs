@@ -74,9 +74,8 @@ fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> Vec<u8> {
     // For leaf nodes, ensure partial key data aligns to felt boundaries
     let (prefix_padding, total_nibble_section) = match kind {
         NodeKind::Leaf | NodeKind::HashedValueLeaf => {
-            // Calculate prefix padding to ensure proper felt boundary alignment
-            let partial_start_offset = 8 + nibble_bytes.saturating_sub(24);
-            let misalignment = partial_start_offset % 8;
+            // Calculate prefix padding to ensure felt boundary alignment
+            let misalignment = nibble_bytes % 8;
             let prefix_pad = if misalignment == 0 { 0 } else { 8 - misalignment };
             let total_section = ((prefix_pad + nibble_bytes + 7) / 8) * 8;
             (prefix_pad, total_section)
