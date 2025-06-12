@@ -68,9 +68,30 @@ fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> Vec<u8> {
 
     let mut result = header.encode();
 
-    // Calculate nibble bytes needed and felt-align to 8-byte boundary
+    // Calculate nibble bytes needed
     let nibble_bytes = (size + 1) / 2; // Round up for odd nibble counts
-    let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+    
+    // For leaf nodes, ensure partial key data aligns to felt boundaries
+    let (prefix_padding, total_nibble_section) = match kind {
+        NodeKind::Leaf | NodeKind::HashedValueLeaf => {
+            // Calculate prefix padding to ensure proper felt boundary alignment
+            let partial_start_offset = 8 + nibble_bytes.saturating_sub(24);
+            let misalignment = partial_start_offset % 8;
+            let prefix_pad = if misalignment == 0 { 0 } else { 8 - misalignment };
+            let total_section = ((prefix_pad + nibble_bytes + 7) / 8) * 8;
+            (prefix_pad, total_section)
+        }
+        _ => {
+            // Branch nodes use standard padding
+            let felt_aligned_bytes = ((nibble_bytes + 7) / 8) * 8;
+            (0, felt_aligned_bytes)
+        }
+    };
+
+    // Add prefix padding for leaf nodes
+    for _ in 0..prefix_padding {
+        result.push(0);
+    }
 
     // Encode nibbles into bytes
     let mut partial_bytes = Vec::new();
@@ -84,8 +105,8 @@ fn fuse_nibbles_node(nibbles: &[u8], kind: NodeKind) -> Vec<u8> {
     // Add the partial bytes
     result.extend_from_slice(&partial_bytes);
 
-    // Pad with zeros to reach felt-aligned length
-    while result.len() - 8 < felt_aligned_bytes {
+    // Pad with zeros to reach total section size
+    while result.len() - 8 < total_nibble_section {
         result.push(0);
     }
 
@@ -99,10 +120,8 @@ impl trie_root::TrieStream for TrieStream {
     }
 
     fn append_empty_data(&mut self) {
-        log::debug!(target: "zk-trie", "TrieStream::append_empty_data called, EMPTY_TRIE: {:02x?}", &trie_constants::EMPTY_TRIE);
         self.buffer
             .extend_from_slice(&trie_constants::EMPTY_TRIE.to_le_bytes());
-        log::debug!(target: "zk-trie", "TrieStream::append_empty_data buffer after: {:02x?}", &self.buffer);
     }
 
     fn append_leaf(&mut self, key: &[u8], value: TrieStreamValue) {
