@@ -182,14 +182,18 @@ where
             NodeHeader::HashedValueLeaf(nibble_count) | NodeHeader::Leaf(nibble_count) => {
                 let nibble_bytes = (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1))
                     / nibble_ops::NIBBLE_PER_BYTE;
-                
+
                 // Calculate prefix padding to ensure partial key data aligns to felt boundaries
                 let misalignment = nibble_bytes % 8;
-                let prefix_padding = if misalignment == 0 { 0 } else { 8 - misalignment };
+                let prefix_padding = if misalignment == 0 {
+                    0
+                } else {
+                    8 - misalignment
+                };
                 let total_nibble_section = ((prefix_padding + nibble_bytes + 7) / 8) * 8;
-                
+
                 let felt_aligned_range = input.take(total_nibble_section)?;
-                
+
                 // Skip prefix padding and locate actual nibble data
                 let nibble_start = felt_aligned_range.start + prefix_padding;
                 let nibble_padding = nibble_count % nibble_ops::NIBBLE_PER_BYTE != 0;
@@ -197,7 +201,7 @@ where
                 if nibble_padding && nibble_ops::pad_left(data[nibble_start]) != 0 {
                     return Err(Error::BadFormat);
                 }
-                
+
                 let partial = nibble_start..(nibble_start + nibble_bytes);
                 let partial_padding = nibble_ops::number_padding(nibble_count);
                 let value = if contains_hash {
@@ -361,14 +365,18 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
 ) -> Vec<u8> {
     let nibble_bytes =
         (nibble_count + (nibble_ops::NIBBLE_PER_BYTE - 1)) / nibble_ops::NIBBLE_PER_BYTE;
-    
+
     // For leaf nodes, ensure partial key data aligns to felt boundaries
     let (prefix_padding, total_nibble_section) = match node_kind {
         NodeKind::Leaf | NodeKind::HashedValueLeaf => {
             // Calculate prefix padding to ensure proper felt boundary alignment
             // for ZK proof verification - align partial data to end at felt boundary
             let misalignment = nibble_bytes % 8;
-            let prefix_pad = if misalignment == 0 { 0 } else { 8 - misalignment };
+            let prefix_pad = if misalignment == 0 {
+                0
+            } else {
+                8 - misalignment
+            };
             let total_section = ((prefix_pad + nibble_bytes + 7) / 8) * 8;
             (prefix_pad, total_section)
         }
@@ -378,7 +386,7 @@ fn partial_from_iterator_encode<I: Iterator<Item = u8>>(
             (0, felt_aligned_bytes)
         }
     };
-    
+
     let mut output = Vec::with_capacity(8 + total_nibble_section);
     match node_kind {
         NodeKind::Leaf => NodeHeader::Leaf(nibble_count).encode_to(&mut output),

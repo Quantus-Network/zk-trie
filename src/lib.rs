@@ -2193,12 +2193,24 @@ mod tests {
             (vec![0x12], 2, "2 nibbles"),
             (vec![0x12, 0x34], 4, "4 nibbles"),
             (vec![0x12, 0x34, 0x56], 6, "6 nibbles"),
-            // Medium partial keys  
+            // Medium partial keys
             (vec![0x12, 0x34, 0x56, 0x78, 0x9a], 10, "10 nibbles"),
-            (vec![0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0], 16, "16 nibbles"),
+            (
+                vec![0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0],
+                16,
+                "16 nibbles",
+            ),
             // Large partial keys (like the user's 94 nibbles case)
-            ((0..47).map(|i| (i * 7 + 13) as u8).collect::<Vec<_>>(), 94, "94 nibbles"),
-            ((0..50).map(|i| (i * 11 + 5) as u8).collect::<Vec<_>>(), 100, "100 nibbles"),
+            (
+                (0..47).map(|i| (i * 7 + 13) as u8).collect::<Vec<_>>(),
+                94,
+                "94 nibbles",
+            ),
+            (
+                (0..50).map(|i| (i * 11 + 5) as u8).collect::<Vec<_>>(),
+                100,
+                "100 nibbles",
+            ),
         ];
 
         for (partial_data, nibble_count, description) in test_cases {
@@ -2214,35 +2226,54 @@ mod tests {
             // Analyze structure
             let header_size = 8;
             let nibble_bytes = (nibble_count + 1) / 2;
-            
+
             // Calculate expected padding based on our felt-alignment logic
             let critical_section_offset = header_size + nibble_bytes.saturating_sub(24);
             let misalignment = critical_section_offset % 8;
-            let expected_prefix_padding = if misalignment == 0 { 0 } else { 8 - misalignment };
-            let expected_total_partial_section = ((expected_prefix_padding + nibble_bytes + 7) / 8) * 8;
+            let expected_prefix_padding = if misalignment == 0 {
+                0
+            } else {
+                8 - misalignment
+            };
+            let expected_total_partial_section =
+                ((expected_prefix_padding + nibble_bytes + 7) / 8) * 8;
 
             // Expected positions
             let partial_section_start = header_size;
             let partial_section_end = partial_section_start + expected_total_partial_section;
             let value_section_start = partial_section_end;
 
-            println!("    Nibble bytes: {}, Expected prefix padding: {}, Total partial section: {}", 
-                     nibble_bytes, expected_prefix_padding, expected_total_partial_section);
+            println!(
+                "    Nibble bytes: {}, Expected prefix padding: {}, Total partial section: {}",
+                nibble_bytes, expected_prefix_padding, expected_total_partial_section
+            );
 
             // Verify the partial section size is felt-aligned
-            assert_eq!(expected_total_partial_section % 8, 0, 
-                       "Partial section size {} is not felt-aligned for {}", 
-                       expected_total_partial_section, description);
+            assert_eq!(
+                expected_total_partial_section % 8,
+                0,
+                "Partial section size {} is not felt-aligned for {}",
+                expected_total_partial_section,
+                description
+            );
 
             // Verify value section starts at felt boundary
-            assert_eq!(value_section_start % 8, 0,
-                       "Value section starts at offset {} which is not felt-aligned for {}",
-                       value_section_start, description);
+            assert_eq!(
+                value_section_start % 8,
+                0,
+                "Value section starts at offset {} which is not felt-aligned for {}",
+                value_section_start,
+                description
+            );
 
             // Verify we can decode the node successfully
             match NodeCodec::<L::Hash>::decode_plan(&encoded) {
                 Ok(plan) => {
-                    if let trie_db::node::NodePlan::Leaf { partial: _, value: _ } = plan {
+                    if let trie_db::node::NodePlan::Leaf {
+                        partial: _,
+                        value: _,
+                    } = plan
+                    {
                         println!("    ✓ Leaf decoded successfully");
                     } else {
                         panic!("Expected leaf node plan for {}", description);
@@ -2255,10 +2286,17 @@ mod tests {
             if nibble_bytes >= 24 {
                 let actual_partial_start = partial_section_start + expected_prefix_padding;
                 let critical_section_start = actual_partial_start + (nibble_bytes - 24);
-                assert_eq!(critical_section_start % 8, 0,
-                           "Critical section starts at offset {} which is not felt-aligned for {}",
-                           critical_section_start, description);
-                println!("    ✓ Critical section is felt-aligned at offset {}", critical_section_start);
+                assert_eq!(
+                    critical_section_start % 8,
+                    0,
+                    "Critical section starts at offset {} which is not felt-aligned for {}",
+                    critical_section_start,
+                    description
+                );
+                println!(
+                    "    ✓ Critical section is felt-aligned at offset {}",
+                    critical_section_start
+                );
             }
 
             println!("    ✓ All alignment checks passed for {}", description);
