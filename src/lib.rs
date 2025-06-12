@@ -75,7 +75,8 @@ pub struct LayoutV0<H>(PhantomData<H>);
 /// substrate trie layout, with external value nodes.
 pub struct LayoutV1<H>(PhantomData<H>);
 
-const FELT_ALIGNED_MAX_INLINE_VALUE: u32 = 24;
+// NOTE: the minimum size of child nodes is 32 bytes, this is just for compatibility with other packages
+const FELT_ALIGNED_MAX_INLINE_VALUE: u32 = 31;
 
 impl<H> TrieLayout for LayoutV0<H>
 where
