@@ -1,0 +1,20 @@
+# all options https://taplo.tamasfe.dev/configuration/formatter-options.html
+
+# This is a taplo configuration file.
+# For more information, see: https://taplo.tamasfe.dev/configuration/
+include = ["**/*.toml"]
+exclude = ["**/target/**"]
+
+[formatting]
+reorder_arrays = true
+inline_table_expand = false
+array_auto_expand = true
+array_auto_collapse = false
+indent_string = "	"         # tab
+
+[[rule]]
+include = ["Cargo.toml"]
+keys = ["workspace.dependencies"]
+
+[rule.formatting]
+reorder_keys = true
