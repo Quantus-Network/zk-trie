@@ -158,19 +158,17 @@ where
                 ];
                 for i in 0..nibble_ops::NIBBLE_LENGTH {
                     if bitmap.value_at(i) {
-                        // Read 8-byte little-endian length
-                        let length_range = input.take(8)?;
-                        let length_bytes = &data[length_range];
-                        let mut length_array = [0u8; 8];
-                        length_array.copy_from_slice(length_bytes);
-                        let count = u64::from_le_bytes(length_array) as usize;
-
-                        let range = input.take(count)?;
-                        children[i] = Some(if count == H::LENGTH {
-                            NodeHandlePlan::Hash(range)
+                        // Children are always 32-byte hashes (no length prefix)
+                        let range = input.take(H::LENGTH)?;
+                        // Check if this is a zero hash (sentinel for "omitted from proof")
+                        let is_zero_hash = data[range.clone()].iter().all(|&b| b == 0);
+                        if is_zero_hash {
+                            // Zero hash = child exists but omitted from proof
+                            // Represent as inline with length 0 so verifier knows not to look it up
+                            children[i] = Some(NodeHandlePlan::Inline(range.start..range.start));
                         } else {
-                            NodeHandlePlan::Inline(range)
-                        });
+                            children[i] = Some(NodeHandlePlan::Hash(range));
+                        }
                     }
                 }
                 Ok(NodePlan::NibbledBranch {
@@ -331,17 +329,16 @@ where
         Bitmap::encode(
             children.map(|maybe_child| match maybe_child.borrow() {
                 Some(ChildReference::Hash(h)) => {
-                    // Always encode hash references with 8-byte length prefix
-                    let length_bytes = (h.as_ref().len() as u64).to_le_bytes();
-                    output.extend_from_slice(&length_bytes);
+                    // Children are always 32-byte hashes (no length prefix)
+                    debug_assert!(h.as_ref().len() == H::LENGTH);
                     output.extend_from_slice(h.as_ref());
                     true
                 }
-                &Some(ChildReference::Inline(inline_data, len)) => {
-                    // Encode length as 8-byte little-endian
-                    let length_bytes = (len as u64).to_le_bytes();
-                    output.extend_from_slice(&length_bytes);
-                    output.extend_from_slice(&inline_data.as_ref()[..len]);
+                &Some(ChildReference::Inline(hash, _len)) => {
+                    // Inline children still get their hash stored (no length prefix)
+                    // The hash is always 32 bytes
+                    debug_assert!(hash.as_ref().len() == H::LENGTH);
+                    output.extend_from_slice(hash.as_ref());
                     true
                 }
                 None => false,

@@ -2415,7 +2415,7 @@ dependencies = [
  "sp-runtime-interface",
  "sp-state-machine",
  "sp-tracing",
- "sp-trie",
+ "sp-trie 38.0.0",
  "tracing",
  "tracing-core",
 ]
@@ -2466,7 +2466,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-std",
- "sp-trie",
+ "sp-trie 38.0.0",
  "sp-weights",
  "tracing",
  "tuplex",
@@ -2509,8 +2509,7 @@ dependencies = [
 [[package]]
 name = "sp-state-machine"
 version = "0.44.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bce4ee5ee6c614994077e6e317270eab6fde2bc346b028290286cbf9d0011b7e"
+source = "git+https://github.com/Quantus-Network/zk-state-machine#06d1e9545428b57aa56e8997c7bf24eaeb48a103"
 dependencies = [
  "hash-db",
  "log",
@@ -2521,7 +2520,7 @@ dependencies = [
  "sp-core",
  "sp-externalities",
  "sp-panic-handler",
- "sp-trie",
+ "sp-trie 38.0.0 (git+https://github.com/Quantus-Network/zk-trie)",
  "thiserror",
  "tracing",
  "trie-db",
@@ -2583,6 +2582,29 @@ dependencies = [
  "trie-db",
  "trie-root",
  "trie-standardmap",
+]
+
+[[package]]
+name = "sp-trie"
+version = "38.0.0"
+source = "git+https://github.com/Quantus-Network/zk-trie#bb1c142115ef1c7cae9378dd438b179d113d29cb"
+dependencies = [
+ "ahash",
+ "hash-db",
+ "log",
+ "memory-db",
+ "nohash-hasher",
+ "parity-scale-codec",
+ "parking_lot",
+ "rand",
+ "scale-info",
+ "schnellru",
+ "sp-core",
+ "sp-externalities",
+ "thiserror",
+ "tracing",
+ "trie-db",
+ "trie-root",
 ]
 
 [[package]]
@@ -3299,8 +3321,3 @@ dependencies = [
  "quote",
  "syn 2.0.101",
 ]
-
-[[patch.unused]]
-name = "sp-state-machine"
-version = "0.35.0"
-source = "git+https://github.com/Quantus-Network/zk-state-machine#2dc9625b7419f225f5928c7944657fc1c67d5a07"
